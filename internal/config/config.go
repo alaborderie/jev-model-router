@@ -140,6 +140,7 @@ func (c Config) Validate() error {
 	}
 	ids := map[string]bool{}
 	validEffort := map[string]bool{"none": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true}
+	configuredEfforts := map[string]bool{}
 	for i, t := range c.Targets {
 		prefix := fmt.Sprintf("target[%d]", i)
 		if t.ID == "" || t.Model == "" || strings.TrimSpace(t.When) == "" {
@@ -166,7 +167,11 @@ func (c Config) Validate() error {
 				return fmt.Errorf("%s.efforts: claude does not support effort %q", prefix, e)
 			}
 			seen[e] = true
+			configuredEfforts[e] = true
 		}
+	}
+	if c.Classifier.Backend == "jev" && len(configuredEfforts) < 2 {
+		return errors.New("jev classifier requires at least two distinct effort levels")
 	}
 	if !ids[c.Routing.SafeTarget] {
 		return fmt.Errorf("routing.safe_target %q must name a configured target", c.Routing.SafeTarget)

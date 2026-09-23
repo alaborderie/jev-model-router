@@ -46,6 +46,7 @@ func TestValidation(t *testing.T) {
 		{"safe target", "safe_target = \"claude-opus\"", "safe_target = \"missing\"", "routing.safe_target"},
 		{"efforts", "efforts = [\"low\", \"medium\"]", "efforts = []", "efforts"},
 		{"claude none", "efforts = [\"low\", \"medium\"]", "efforts = [\"none\", \"low\"]", "claude does not support effort"},
+		{"one Jev effort", "efforts = [\"medium\", \"high\", \"xhigh\", \"max\"]", "efforts = [\"low\"]", "two distinct effort levels"},
 		{"duplicate", "id = \"claude-haiku\"", "id = \"claude-opus\"", "duplicate"},
 		{"unknown", "preview_bytes = 8000", "preview_bytes = 8000\nwrong = true", "unknown config key"},
 	}
@@ -53,6 +54,9 @@ func TestValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.toml")
 			s := strings.Replace(Starter, tc.find, tc.replacement, 1)
+			if tc.name == "one Jev effort" {
+				s = strings.Replace(s, "efforts = [\"low\", \"medium\"]", "efforts = [\"low\"]", 1)
+			}
 			if err := os.WriteFile(path, []byte(s), 0600); err != nil {
 				t.Fatal(err)
 			}
