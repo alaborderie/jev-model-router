@@ -15,7 +15,7 @@ import (
 
 func testConfig(t *testing.T) config.Config {
 	t.Helper()
-	c := config.Config{Classifier: config.Classifier{Backend: "jev", ConfidenceGate: 0.6, TimeoutMS: 2000, PreviewBytes: 8, Jev: config.Jev{Model: "jev-latest"}}, Routing: config.Routing{SafeTarget: "big", DefaultEngine: "claude"}, Targets: []config.Target{{ID: "small", Engine: "claude", Model: "haiku", Efforts: []string{"none", "low"}, When: "easy tasks"}, {ID: "big", Engine: "claude", Model: "opus", Efforts: []string{"medium", "high"}, When: "hard tasks"}}}
+	c := config.Config{Classifier: config.Classifier{Backend: "jev", ConfidenceGate: 0.6, TimeoutMS: 2000, PreviewBytes: 8, Jev: config.Jev{Model: "jev-latest"}}, Routing: config.Routing{SafeTarget: "big", DefaultEngine: "claude"}, Targets: []config.Target{{ID: "small", Engine: "claude", Model: "haiku", Efforts: []string{"low", "medium"}, When: "easy tasks"}, {ID: "big", Engine: "claude", Model: "opus", Efforts: []string{"medium", "high"}, When: "hard tasks"}}}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestJevRequestAndResponse(t *testing.T) {
 			t.Errorf("bad payload %+v", body)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"answers":{"target":{"type":"choice","choice":"big","confidence":0.87},"effort":{"type":"score","score":2.2,"confidence":0.72}}}`))
+		_, _ = w.Write([]byte(`{"answers":{"target":{"type":"choice","choice":"big","confidence":0.87},"effort":{"type":"score","score":1.2,"confidence":0.72}}}`))
 	}))
 	defer server.Close()
 	d, err := (Jev{URL: server.URL + "/v1/systemone"}).Classify(context.Background(), "123456789abcdef", testConfig(t))

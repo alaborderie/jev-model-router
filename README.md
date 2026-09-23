@@ -18,7 +18,7 @@ mroute run "Explain this error"
 
 ## Configuration and privacy
 
-`mroute init` creates `$XDG_CONFIG_HOME/mroute/config.toml`, or `~/.config/mroute/config.toml` when XDG_CONFIG_HOME is unset. It refuses to overwrite the file; use `mroute init --force` to replace it. Each `[[target]]` declares an engine, model, supported efforts, and a short routing description. `routing.safe_target` identifies the fallback when classification is uncertain or fails.
+`mroute init` creates `$XDG_CONFIG_HOME/mroute/config.toml`, or `~/.config/mroute/config.toml` when XDG_CONFIG_HOME is unset. It refuses to overwrite the file; use `mroute init --force` to replace it. Each `[[target]]` declares an engine, model, supported efforts, and a short routing description. Claude targets cannot include `none` because the Claude CLI does not accept it. `routing.safe_target` identifies the fallback when classification is uncertain or fails.
 
 The default `jev` classifier sends a bounded prompt preview (at most `classifier.preview_bytes`, initially 8000 bytes) to TypeSafe. Set `TYPESAFE_API_KEY` in the environment, not the config. Set `classifier.backend = "heuristics"` for offline routing without a key or network. `openai` can use a local OpenAI-compatible endpoint. Full prompts and keys are not written to route logs.
 
@@ -30,7 +30,7 @@ Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired b
 
 | Backend | Target accuracy | Effort within band | p50 | p95 |
 | --- | ---: | ---: | ---: | ---: |
-| Jev (`jev-latest`) | 92.5% | 92.5% | 295 ms | 391 ms |
+| Jev (`jev-latest`) | 92.5% | 95.0% | 288 ms | 360 ms |
 | Heuristics | 62.5% | 32.5% | 0 ms | 0 ms |
 
 Jev passed the M1 gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms p50, and 2500 ms p95 on this seed set. Three Jev cases fell below the configured 0.60 choice-confidence gate and routed to the safe target. Results can shift when the `jev-latest` alias or network conditions change. The confidence gate and fallback are included in the reported accuracy; `mroute eval` uses the same decision path as `route` and `run`.

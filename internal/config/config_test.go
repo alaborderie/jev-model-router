@@ -19,6 +19,13 @@ func TestStarterAndInit(t *testing.T) {
 	if c.Routing.SafeTarget != "claude-opus" || len(c.Targets) != 2 {
 		t.Fatalf("bad starter: %+v", c)
 	}
+	for _, target := range c.Targets {
+		for _, effort := range target.Efforts {
+			if target.Engine == "claude" && effort == "none" {
+				t.Fatalf("starter gives unsupported effort to Claude: %+v", target)
+			}
+		}
+	}
 	if err := Init(path, false); !os.IsExist(err) {
 		t.Fatalf("expected existing-file error, got %v", err)
 	}
@@ -37,7 +44,8 @@ func TestValidation(t *testing.T) {
 	cases := []struct{ name, find, replacement, want string }{
 		{"backend", "\nbackend = \"jev\"", "\nbackend = \"wrong\"", "classifier.backend"},
 		{"safe target", "safe_target = \"claude-opus\"", "safe_target = \"missing\"", "routing.safe_target"},
-		{"efforts", "efforts = [\"none\", \"low\", \"medium\"]", "efforts = []", "efforts"},
+		{"efforts", "efforts = [\"low\", \"medium\"]", "efforts = []", "efforts"},
+		{"claude none", "efforts = [\"low\", \"medium\"]", "efforts = [\"none\", \"low\"]", "claude does not support effort"},
 		{"duplicate", "id = \"claude-haiku\"", "id = \"claude-opus\"", "duplicate"},
 		{"unknown", "preview_bytes = 8000", "preview_bytes = 8000\nwrong = true", "unknown config key"},
 	}

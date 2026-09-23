@@ -65,7 +65,7 @@ default_engine = "claude"
 id = "claude-haiku"
 engine = "claude"
 model = "claude-haiku-4-5"
-efforts = ["none", "low", "medium"]
+efforts = ["low", "medium"]
 when = "mechanical edits, renames, formatting, single-file lookups"
 
 [[target]]
@@ -161,6 +161,9 @@ func (c Config) Validate() error {
 		for _, e := range t.Efforts {
 			if !validEffort[e] || seen[e] {
 				return fmt.Errorf("%s.efforts contains invalid or duplicate effort %q", prefix, e)
+			}
+			if t.Engine == "claude" && e == "none" {
+				return fmt.Errorf("%s.efforts: claude does not support effort %q", prefix, e)
 			}
 			seen[e] = true
 		}
