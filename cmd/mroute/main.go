@@ -48,6 +48,12 @@ func run(args []string) error {
 		}
 		return hookPrompt(os.Stdin, os.Stdout)
 	}
+	if args[0] == "hook-agent" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: mroute hook-agent")
+		}
+		return hookAgent(os.Stdin, os.Stdout)
+	}
 	path, err := config.Path()
 	if err != nil {
 		return err

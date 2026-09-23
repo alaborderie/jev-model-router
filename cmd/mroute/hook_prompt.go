@@ -19,25 +19,28 @@ import (
 const promptHookBudget = 1800 * time.Millisecond
 
 func hookPrompt(in io.Reader, out io.Writer) error {
-	return hookPromptWithRoute(in, out, func(prompt string) (router.Entry, error) {
-		binary, err := os.Executable()
-		if err != nil {
-			return router.Entry{}, err
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), promptHookBudget)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, binary, "route", "--json", prompt)
-		var stdout bytes.Buffer
-		cmd.Stdout = &stdout
-		if err := cmd.Run(); err != nil {
-			return router.Entry{}, err
-		}
-		var entry router.Entry
-		if err := json.Unmarshal(stdout.Bytes(), &entry); err != nil {
-			return router.Entry{}, err
-		}
-		return entry, nil
-	})
+	return hookPromptWithRoute(in, out, routeForHook)
+}
+
+func routeForHook(prompt string) (router.Entry, error) {
+	binary, err := os.Executable()
+	if err != nil {
+		return router.Entry{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), promptHookBudget)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binary, "route", "--json", prompt)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return router.Entry{}, err
+	}
+	var entry router.Entry
+	if err := json.Unmarshal(stdout.Bytes(), &entry); err != nil {
+		return router.Entry{}, err
+	}
+	return entry, nil
+
 }
 
 func hookPromptWithRoute(in io.Reader, out io.Writer, route func(string) (router.Entry, error)) error {
