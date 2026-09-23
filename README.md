@@ -14,7 +14,7 @@ mroute route "Explain this error"
 mroute run "Explain this error"
 ```
 
-`route` and `run` are delivered later in M1. Until then, `init` is the available command.
+`mroute route` prints a recommendation without launching an engine. `mroute run` launches the selected engine. `mroute log` shows the JSONL decision log and `mroute explain` shows the latest decision. Run `mroute eval eval/cases.jsonl` from the repository to measure the included 40-case set.
 
 ## Configuration and privacy
 
@@ -23,3 +23,14 @@ mroute run "Explain this error"
 The default `jev` classifier sends a bounded prompt preview (at most `classifier.preview_bytes`, initially 8000 bytes) to TypeSafe. Set `TYPESAFE_API_KEY` in the environment, not the config. Set `classifier.backend = "heuristics"` for offline routing without a key or network. `openai` can use a local OpenAI-compatible endpoint. Full prompts and keys are not written to route logs.
 
 The CLI runs only one task at a time. Plugin recommendations in later milestones will not silently switch the model in an existing Claude Code or opencode session.
+
+## M1 routing evaluation
+
+Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired backend configured. The 40 cases are hand-labeled examples of mechanical and complex coding tasks, not a representative production sample. On 2026-09-23, the starter target catalogue produced:
+
+| Backend | Target accuracy | Effort within band | p50 | p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Jev (`jev-latest`) | 92.5% | 92.5% | 295 ms | 391 ms |
+| Heuristics | 62.5% | 32.5% | 0 ms | 0 ms |
+
+Jev passed the M1 gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms p50, and 2500 ms p95 on this seed set. Three Jev cases fell below the configured 0.60 choice-confidence gate and routed to the safe target. Results can shift when the `jev-latest` alias or network conditions change. The confidence gate and fallback are included in the reported accuracy; `mroute eval` uses the same decision path as `route` and `run`.

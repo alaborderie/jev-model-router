@@ -1,0 +1,40 @@
+{"prompt":"Rename a variable in one Go file without changing behavior","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["mechanical"]}
+{"prompt":"Format this JSON document with consistent indentation","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["format"]}
+{"prompt":"Fix the typo in the README heading","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["mechanical"]}
+{"prompt":"List the exported functions in this file","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["lookup"]}
+{"prompt":"Change a CSS color token from blue to green","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["mechanical"]}
+{"prompt":"Sort the imports in this Go source file","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["format"]}
+{"prompt":"Find where the User struct is declared","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["lookup"]}
+{"prompt":"Add a missing comma to this JSON object","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["mechanical"]}
+{"prompt":"Convert this timestamp from UTC to CET","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["lookup"]}
+{"prompt":"Update this package name after a directory rename","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["mechanical"]}
+{"prompt":"Explain what this small pure function returns","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["lookup"]}
+{"prompt":"Write a straightforward unit test for this pure string helper","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["coding"]}
+{"prompt":"Extract this repeated literal into a constant in one file","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["mechanical"]}
+{"prompt":"Add an example command to the usage section of the README","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["docs"]}
+{"prompt":"Translate this brief comment into French","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["docs"]}
+{"prompt":"Check whether this regular expression matches the sample string","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["lookup"]}
+{"prompt":"Replace a deprecated function call with its direct equivalent","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["mechanical"]}
+{"prompt":"Add a simple required field to this form and validation message","expected_target":"claude-haiku","expected_effort_band":["low","medium"],"tags":["coding"]}
+{"prompt":"Summarize the purpose of this one-file script","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["lookup"]}
+{"prompt":"Generate a sample curl command for this documented endpoint","expected_target":"claude-haiku","expected_effort_band":["none","low"],"tags":["docs"]}
+{"prompt":"Investigate why the production API intermittently returns 500 errors across three services","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["debug"]}
+{"prompt":"Design a migration from a monolith to event-driven services and compare failure modes","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["architecture"]}
+{"prompt":"Debug a race condition that only appears during concurrent shutdown","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["debug"]}
+{"prompt":"Refactor authentication across the API, database, and frontend without breaking sessions","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["refactor"]}
+{"prompt":"Explain the tradeoffs of optimistic locking versus serializable transactions here","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["architecture"]}
+{"prompt":"Trace a memory leak through a long-running Go worker and propose a fix","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["debug"]}
+{"prompt":"Plan a zero-downtime schema migration for a billion-row table","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["architecture"]}
+{"prompt":"Review this cryptographic protocol for replay and downgrade vulnerabilities","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["security"]}
+{"prompt":"Find the root cause of flaky integration tests involving Redis and async jobs","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["debug"]}
+{"prompt":"Choose an architecture for tenant isolation with strict cross-tenant guarantees","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["architecture"]}
+{"prompt":"Implement a multi-file parser refactor while preserving error locations","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["refactor"]}
+{"prompt":"Diagnose why p95 latency doubled after a deployment using traces and query plans","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["debug"]}
+{"prompt":"Evaluate two competing caching strategies under consistency requirements","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["architecture"]}
+{"prompt":"Repair a data corruption bug and create a safe backfill for affected records","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["debug"]}
+{"prompt":"Design a resilient payment workflow across retries, webhooks, and partial failures","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["architecture"]}
+{"prompt":"Investigate an ambiguous deadlock spanning database locks and worker queues","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["debug"]}
+{"prompt":"Rework the build pipeline across multiple repositories with reproducible artifacts","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["refactor"]}
+{"prompt":"Analyze a subtle authorization bypass in nested resource ownership checks","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["security"]}
+{"prompt":"Plan the upgrade of a stateful cluster while preserving availability and rollback","expected_target":"claude-opus","expected_effort_band":["xhigh","max"],"tags":["architecture"]}
+{"prompt":"Debug why distributed workers process some events twice despite idempotency keys","expected_target":"claude-opus","expected_effort_band":["high","max"],"tags":["debug"]}
