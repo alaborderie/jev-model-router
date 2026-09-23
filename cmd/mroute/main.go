@@ -36,6 +36,24 @@ func run(args []string) error {
 		fmt.Println(path)
 		return nil
 	}
+	if args[0] == "mcp" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: mroute mcp")
+		}
+		return serveMCP(os.Stdin, os.Stdout)
+	}
+	if args[0] == "hook-prompt" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: mroute hook-prompt")
+		}
+		return hookPrompt(os.Stdin, os.Stdout)
+	}
+	if args[0] == "hook-agent" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: mroute hook-agent")
+		}
+		return hookAgent(os.Stdin, os.Stdout)
+	}
 	path, err := config.Path()
 	if err != nil {
 		return err
@@ -54,11 +72,22 @@ func run(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("usage: mroute %s PROMPT", args[0])
 		}
-		prompt := strings.Join(args[1:], " ")
+		jsonRoute := args[0] == "route" && args[1] == "--json"
+		if jsonRoute && len(args) < 3 {
+			return fmt.Errorf("usage: mroute route --json PROMPT")
+		}
+		promptArgs := args[1:]
+		if jsonRoute {
+			promptArgs = args[2:]
+		}
+		prompt := strings.Join(promptArgs, " ")
 		if args[0] == "route" {
 			entry, err := r.Route(context.Background(), prompt)
 			if err != nil {
 				return err
+			}
+			if jsonRoute {
+				return json.NewEncoder(os.Stdout).Encode(entry)
 			}
 			fmt.Printf("routed to %s @ effort %s because %s\n", entry.TargetID, entry.Effort, entry.Reason)
 			return nil

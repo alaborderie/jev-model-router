@@ -1,0 +1,30 @@
+{
+  "description": "Suggest a route on prompt submission without blocking the turn",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/agent.sh"],
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/prompt.sh"],
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}
