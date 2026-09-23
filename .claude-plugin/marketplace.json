@@ -1,0 +1,8 @@
+{
+  "name": "mroute-marketplace",
+  "description": "Claude Code integration for the local mroute CLI",
+  "owner": { "name": "mroute" },
+  "plugins": [
+    { "name": "mroute", "source": "./plugin/claude" }
+  ]
+}

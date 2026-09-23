@@ -24,6 +24,17 @@ The default `jev` classifier sends a bounded prompt preview (at most `classifier
 
 The CLI runs only one task at a time. Plugin recommendations in later milestones will not silently switch the model in an existing Claude Code or opencode session.
 
+## Claude Code plugin
+
+After installing `mroute` and running `mroute init`, add this repository as a Claude Code marketplace and install its plugin:
+
+```sh
+claude plugin marketplace add alaborderie/f-0923-jev-model-router
+claude plugin install mroute@mroute-marketplace
+```
+
+Restart Claude Code, then use `/mroute:route Explain this error` for a separate one-shot task. The plugin passes the prompt to the local `mroute` tool as structured data, which launches `mroute run`; it does not change the model of the current conversation. If the command is missing, confirm `mroute` is on Claude Code's `PATH` and that `mroute init` has created a config.
+
 ## M1 routing evaluation
 
 Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired backend configured. The 40 cases are hand-labeled examples of mechanical and complex coding tasks, not a representative production sample. On 2026-09-23, the starter target catalogue produced:

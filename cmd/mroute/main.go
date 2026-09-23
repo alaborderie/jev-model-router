@@ -36,6 +36,12 @@ func run(args []string) error {
 		fmt.Println(path)
 		return nil
 	}
+	if args[0] == "mcp" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: mroute mcp")
+		}
+		return serveMCP(os.Stdin, os.Stdout)
+	}
 	path, err := config.Path()
 	if err != nil {
 		return err
