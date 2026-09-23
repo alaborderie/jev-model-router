@@ -23,6 +23,9 @@ func tokens(s string) map[string]bool {
 func (Heuristics) Classify(ctx context.Context, prompt string, c config.Config) (Decision, error) {
 	start := time.Now()
 	if err := ctx.Err(); err != nil {
+		if err == context.Canceled {
+			return Decision{}, err
+		}
 		return Decision{}, &Error{Kind: Timeout, Err: err}
 	}
 	words := tokens(prompt)

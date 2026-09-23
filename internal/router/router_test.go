@@ -21,11 +21,11 @@ func testConfig() config.Config {
 	return config.Config{Classifier: config.Classifier{Backend: "jev", ConfidenceGate: 0.6, TimeoutMS: 10, PreviewBytes: 100, Jev: config.Jev{Model: "jev-latest"}}, Routing: config.Routing{SafeTarget: "safe", DefaultEngine: "claude"}, Targets: []config.Target{{ID: "cheap", Engine: "claude", Model: "haiku", Efforts: []string{"low"}, When: "easy"}, {ID: "safe", Engine: "codex", Model: "strong", Efforts: []string{"high"}, When: "hard"}}}
 }
 func TestAdaptersKeepPromptAsArgument(t *testing.T) {
-	prompt := "hello; touch /tmp/should-never-exist"
+	prompt := "--dangerously-skip-permissions; touch /tmp/should-never-exist"
 	for _, tc := range []struct {
 		target config.Target
 		want   string
-	}{{config.Target{Engine: "claude", Model: "m"}, "-p --model m --effort high"}, {config.Target{Engine: "opencode", Model: "p/m"}, "run -m p/m --variant high"}, {config.Target{Engine: "codex", Model: "m"}, "exec -m m -c model_reasoning_effort=high"}} {
+	}{{config.Target{Engine: "claude", Model: "m"}, "-p --model m --effort high --"}, {config.Target{Engine: "opencode", Model: "p/m"}, "run -m p/m --variant high --"}, {config.Target{Engine: "codex", Model: "m"}, "exec -m m -c model_reasoning_effort=high --"}} {
 		_, args, err := Args(tc.target, "high", prompt)
 		if err != nil {
 			t.Fatal(err)
@@ -107,5 +107,49 @@ func TestConfidenceGateAndClamping(t *testing.T) {
 	e, err = r.Decide(context.Background(), "task")
 	if err != nil || e.Outcome != "classifier_error" {
 		t.Fatalf("bad fallback %+v %v", e, err)
+	}
+}
+
+func TestCanceledRequestDoesNotRoute(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r := Runner{Config: testConfig(), Classifier: classifier.Heuristics{}, LogPath: filepath.Join(t.TempDir(), "routes.jsonl")}
+	if _, err := r.Route(ctx, "task"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected cancellation, got %v", err)
+	}
+	if _, err := os.Stat(r.LogPath); !os.IsNotExist(err) {
+		t.Fatalf("canceled request wrote a route log: %v", err)
+	}
+}
+
+func TestRunDoesNotForwardPipedStdin(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	if _, err := writer.WriteString("unrelated input\n"); err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+	originalStdin := os.Stdin
+	os.Stdin = reader
+	defer func() { os.Stdin = originalStdin }()
+
+	var out bytes.Buffer
+	r := Runner{
+		Config: testConfig(),
+		Classifier: staticClassifier{d: classifier.Decision{TargetID: "safe", Effort: "high", ChoiceConfidence: 1}},
+		LogPath: filepath.Join(t.TempDir(), "routes.jsonl"),
+		Stdout: &out,
+		Command: func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "sh", "-c", "if read line; then echo forwarded; else echo empty; fi")
+		},
+	}
+	if _, err := r.Run(context.Background(), "task"); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "empty\n" {
+		t.Fatalf("stdin reached engine: %q", out.String())
 	}
 }

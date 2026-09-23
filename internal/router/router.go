@@ -66,11 +66,11 @@ func LogPath() (string, error) {
 func Args(t config.Target, effort, prompt string) (string, []string, error) {
 	switch t.Engine {
 	case "claude":
-		return "claude", []string{"-p", "--model", t.Model, "--effort", effort, prompt}, nil
+		return "claude", []string{"-p", "--model", t.Model, "--effort", effort, "--", prompt}, nil
 	case "opencode":
-		return "opencode", []string{"run", "-m", t.Model, "--variant", effort, prompt}, nil
+		return "opencode", []string{"run", "-m", t.Model, "--variant", effort, "--", prompt}, nil
 	case "codex":
-		return "codex", []string{"exec", "-m", t.Model, "-c", "model_reasoning_effort=" + effort, prompt}, nil
+		return "codex", []string{"exec", "-m", t.Model, "-c", "model_reasoning_effort=" + effort, "--", prompt}, nil
 	default:
 		return "", nil, fmt.Errorf("unsupported engine %q", t.Engine)
 	}
@@ -87,6 +87,9 @@ func (r Runner) Decide(ctx context.Context, prompt string) (Entry, error) {
 	started := time.Now()
 	d, err := cl.Classify(classCtx, prompt, c)
 	latency := time.Since(started)
+	if ctx.Err() != nil {
+		return Entry{}, ctx.Err()
+	}
 	outcome := "ok"
 	reason := "classified"
 	if err != nil {
@@ -139,7 +142,8 @@ func (r Runner) Run(ctx context.Context, prompt string) (Entry, error) {
 		makeCmd = exec.CommandContext
 	}
 	cmd := makeCmd(ctx, bin, args...)
-	cmd.Stdin = os.Stdin
+	// A supplied prompt is complete; do not append unrelated piped stdin to it.
+	cmd.Stdin = nil
 	cmd.Stdout = r.Stdout
 	cmd.Stderr = r.Stderr
 	if r.Stderr != nil {

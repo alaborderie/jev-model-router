@@ -36,8 +36,8 @@ func TestHeuristicsOffline(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := (Heuristics{}).Classify(ctx, "x", c); err == nil {
-		t.Fatal("expected cancellation")
+	if _, err := (Heuristics{}).Classify(ctx, "x", c); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected cancellation, got %v", err)
 	}
 }
 func TestOpenAI(t *testing.T) {
