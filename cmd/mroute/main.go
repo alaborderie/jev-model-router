@@ -146,7 +146,7 @@ func run(args []string) error {
 	}
 }
 
-// routePromptArgs treats -- as the boundary after which all arguments are prompt text.
+// routePromptArgs parses the --json output flag and treats -- as the prompt boundary.
 func routePromptArgs(args []string) (string, bool, error) {
 	jsonRoute := len(args) > 0 && args[0] == "--json"
 	if jsonRoute {
