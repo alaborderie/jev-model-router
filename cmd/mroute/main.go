@@ -72,15 +72,16 @@ func run(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("usage: mroute %s PROMPT", args[0])
 		}
-		jsonRoute := args[0] == "route" && args[1] == "--json"
-		if jsonRoute && len(args) < 3 {
-			return fmt.Errorf("usage: mroute route --json PROMPT")
+		var prompt string
+		var jsonRoute bool
+		if args[0] == "route" {
+			prompt, jsonRoute, err = routePromptArgs(args[1:])
+			if err != nil {
+				return err
+			}
+		} else {
+			prompt = strings.Join(args[1:], " ")
 		}
-		promptArgs := args[1:]
-		if jsonRoute {
-			promptArgs = args[2:]
-		}
-		prompt := strings.Join(promptArgs, " ")
 		if args[0] == "route" {
 			entry, err := r.Route(context.Background(), prompt)
 			if err != nil {
@@ -143,4 +144,19 @@ func run(args []string) error {
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+// routePromptArgs parses the --json output flag and treats -- as the prompt boundary.
+func routePromptArgs(args []string) (string, bool, error) {
+	jsonRoute := len(args) > 0 && args[0] == "--json"
+	if jsonRoute {
+		args = args[1:]
+	}
+	if len(args) > 0 && args[0] == "--" {
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		return "", false, fmt.Errorf("usage: mroute route [--json] [--] PROMPT")
+	}
+	return strings.Join(args, " "), jsonRoute, nil
 }

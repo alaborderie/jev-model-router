@@ -16,6 +16,8 @@ mroute run "Explain this error"
 
 `mroute route` prints a recommendation without launching an engine. `mroute run` launches the selected engine. `mroute log` shows the JSONL decision log and `mroute explain` shows the latest decision. Run `mroute eval eval/cases.jsonl` from the repository to measure the included 40-case set.
 
+Use `mroute route --json "Explain this error"` for a JSON recommendation. To route prompt text beginning with a flag, put `--` before the prompt: `mroute route -- --json` routes the literal prompt `--json` in human-readable mode, and `mroute route --json -- --json` routes it in JSON mode.
+
 ## Configuration and privacy
 
 `mroute init` creates `$XDG_CONFIG_HOME/mroute/config.toml`, or `~/.config/mroute/config.toml` when XDG_CONFIG_HOME is unset. It refuses to overwrite the file; use `mroute init --force` to replace it. Each `[[target]]` declares an engine, model, supported efforts, and a short routing description. Claude targets cannot include `none` because the Claude CLI does not accept it. `routing.safe_target` identifies the fallback when classification is uncertain or fails.

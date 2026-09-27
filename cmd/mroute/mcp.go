@@ -72,8 +72,8 @@ func serveMCPWithRun(in io.Reader, out io.Writer, run func(string) (string, erro
 					Prompt string `json:"prompt"`
 				} `json:"arguments"`
 			}
-			if err := json.Unmarshal(msg.Params, &params); err != nil || params.Name != "route" || params.Arguments.Prompt == "" {
-				response["error"] = map[string]any{"code": -32602, "message": "route requires a nonempty prompt"}
+			if err := json.Unmarshal(msg.Params, &params); err != nil || params.Name != "route" || strings.TrimSpace(params.Arguments.Prompt) == "" {
+				response["error"] = map[string]any{"code": -32602, "message": "route requires a nonblank prompt"}
 				break
 			}
 			output, err := run(params.Arguments.Prompt)
