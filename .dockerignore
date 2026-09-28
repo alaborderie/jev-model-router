@@ -1,0 +1,10 @@
+.git
+.github
+.env*
+*.key
+*.pem
+node_modules
+target
+distribution
+eval
+plugin
