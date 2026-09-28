@@ -53,9 +53,44 @@ Ask the agent to use the `route` tool with a prompt to launch a **separate one-s
 
 Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired backend configured. The 40 cases are hand-labeled examples of mechanical and complex coding tasks, not a representative production sample. On 2026-09-23, the starter target catalogue produced:
 
+For a deterministic offline table, run `go run ./cmd/mroute eval --table --config eval/heuristics.toml eval/cases.jsonl`; the generated output is committed at [eval/results.md](eval/results.md). The Jev figures below are a historical live run, not a deterministic replay: the `jev-latest` alias and latency may change.
+
 | Backend | Target accuracy | Effort within band | p50 | p95 |
 | --- | ---: | ---: | ---: | ---: |
 | Jev (`jev-latest`) | 92.5% | 95.0% | 288 ms | 360 ms |
 | Heuristics | 62.5% | 32.5% | 0 ms | 0 ms |
 
 Jev passed the M1 gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms p50, and 2500 ms p95 on this seed set. Three Jev cases fell below the configured 0.60 choice-confidence gate and routed to the safe target. Results can shift when the `jev-latest` alias or network conditions change. The confidence gate and fallback are included in the reported accuracy; `mroute eval` uses the same decision path as `route` and `run`.
+
+## Configuration reference
+
+`mroute init` writes the starter values below; a custom TOML file must supply the required fields (there are no implicit config defaults). `mroute eval --config FILE` and `mroute doctor --config FILE` let you inspect a particular catalogue without changing your personal config.
+
+| Field | Starter value | Meaning |
+| --- | --- | --- |
+| `classifier.backend` | `jev` | `jev`, `openai`, or offline `heuristics` |
+| `classifier.confidence_gate` | `0.60` | Choice confidence below this 0–1 threshold routes to the safe target |
+| `classifier.timeout_ms` | `2000` | Positive classifier deadline in milliseconds |
+| `classifier.preview_bytes` | `8000` | Maximum prompt preview bytes sent to a classifier (1–32768) |
+| `classifier.jev.model` | `jev-latest` | TypeSafe model; key comes from `TYPESAFE_API_KEY` in the environment |
+| `classifier.openai.base_url` | `http://127.0.0.1:8080/v1` | OpenAI-compatible endpoint (may be local) |
+| `classifier.openai.model` | `local` | Model served by that endpoint |
+| `routing.safe_target` | `claude-opus` | ID of the target used for low confidence or classifier failure |
+| `routing.default_engine` | `claude` | Configured engine name (`claude`, `opencode`, `codex`) |
+| `[[target]].id` | `claude-haiku`, `claude-opus` | Unique target IDs; at least two targets required |
+| `[[target]].engine` | `claude` | CLI adapter: `claude`, `opencode`, or `codex` |
+| `[[target]].model` | `claude-haiku-4-5`, `claude-opus-4-6` | Model name passed to the engine CLI |
+| `[[target]].efforts` | `low, medium` / `medium, high, xhigh, max` | Supported efforts (`none`, `low`, `medium`, `high`, `xhigh`, `max`); Claude excludes `none` |
+| `[[target]].when` | task descriptions in starter config | Routing rubric for each target |
+
+The default Jev backend sends at most `classifier.preview_bytes` of each prompt to TypeSafe. Use `heuristics` for no-network classification or a local `openai` endpoint for a local model; the engine CLI owns its own authentication. Full prompts and keys are not logged.
+
+## Engine capability check
+
+Run `mroute doctor` after `mroute init`, or `go run ./cmd/mroute doctor --config eval/heuristics.toml` for the committed offline catalogue. The probe asks each configured engine CLI for help; it does not launch a model request. Example on a machine with the supported Claude CLI:
+
+```text
+claude: supported (required flags: -p, --model, --effort)
+```
+
+Claude needs `-p`, `--model`, and `--effort`; opencode needs `run -m --variant`; Codex needs `exec -m -c`. A missing binary reports `command unavailable`; an older CLI whose help lacks a required flag reports e.g. `opencode: missing --variant (required flags: -m, --variant)` and `mroute doctor` exits nonzero. Update the engine CLI or choose supported targets before launching routed work.

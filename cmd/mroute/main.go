@@ -20,7 +20,7 @@ func main() {
 }
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: mroute init|route|run|log|explain|eval")
+		return fmt.Errorf("usage: mroute init|route|run|log|explain|eval|doctor")
 	}
 	if args[0] == "init" {
 		if len(args) > 2 || (len(args) == 2 && args[1] != "--force") {
@@ -58,6 +58,21 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	casePath := ""
+	table := false
+	if args[0] == "eval" {
+		var configPath string
+		casePath, configPath, table, err = evalArgs(args[1:])
+		if err != nil {
+			return err
+		}
+		if configPath != "" {
+			path = configPath
+		}
+	}
+	if args[0] == "doctor" && len(args) == 3 && args[1] == "--config" {
+		path = args[2]
+	}
 	c, err := config.Load(path)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -68,6 +83,19 @@ func run(args []string) error {
 	}
 	r := router.Runner{Config: c, LogPath: logPath, Stdout: os.Stdout, Stderr: os.Stderr}
 	switch args[0] {
+	case "doctor":
+		if len(args) != 1 && !(len(args) == 3 && args[1] == "--config") {
+			return fmt.Errorf("usage: mroute doctor [--config FILE]")
+		}
+		failed := false
+		for _, capability := range router.Doctor(context.Background(), c, nil) {
+			fmt.Printf("%s: %s (required flags: %s)\n", capability.Engine, capability.Detail, strings.Join(capability.Flags, ", "))
+			failed = failed || !capability.OK
+		}
+		if failed {
+			return fmt.Errorf("one or more configured engine CLIs lack required capabilities")
+		}
+		return nil
 	case "route", "run":
 		if len(args) < 2 {
 			return fmt.Errorf("usage: mroute %s PROMPT", args[0])
@@ -125,13 +153,6 @@ func run(args []string) error {
 		}
 		return fmt.Errorf("no matching route")
 	case "eval":
-		if len(args) > 2 {
-			return fmt.Errorf("usage: mroute eval [CASES_JSONL]")
-		}
-		casePath := "eval/cases.jsonl"
-		if len(args) == 2 {
-			casePath = args[1]
-		}
 		cases, err := eval.Load(casePath)
 		if err != nil {
 			return err
@@ -140,10 +161,35 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
+		if table {
+			return eval.WriteTable(os.Stdout, report)
+		}
 		return eval.Write(os.Stdout, report)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func evalArgs(args []string) (casePath, configPath string, table bool, err error) {
+	casePath = "eval/cases.jsonl"
+	for len(args) > 0 {
+		switch args[0] {
+		case "--table":
+			table = true
+			args = args[1:]
+		case "--config":
+			if len(args) < 2 {
+				return "", "", false, fmt.Errorf("usage: mroute eval [--table] [--config FILE] [CASES_JSONL]")
+			}
+			configPath, args = args[1], args[2:]
+		default:
+			if args[0] == "" || strings.HasPrefix(args[0], "-") || len(args) != 1 {
+				return "", "", false, fmt.Errorf("usage: mroute eval [--table] [--config FILE] [CASES_JSONL]")
+			}
+			casePath, args = args[0], nil
+		}
+	}
+	return casePath, configPath, table, nil
 }
 
 // routePromptArgs parses the --json output flag and treats -- as the prompt boundary.
