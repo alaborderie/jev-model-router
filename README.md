@@ -43,6 +43,12 @@ For Claude `Agent`/legacy `Task` subagent spawns, the plugin can set the subagen
 
 The config at `$XDG_CONFIG_HOME/mroute/config.toml` controls all plugin paths. `classifier.backend` chooses `jev`, `openai`, or `heuristics`; `classifier.confidence_gate`, `timeout_ms`, and `preview_bytes` control classification. `routing.safe_target` is the fallback target. Each `[[target]]` supplies `id`, `engine`, `model`, `efforts`, and `when`. The TypeSafe key belongs in `TYPESAFE_API_KEY` in the environment. If you use the default Jev backend, the prompt hook sends a bounded preview of each submitted prompt to TypeSafe; `heuristics` sends nothing over the network.
 
+## opencode plugin
+
+Install `mroute` and initialize its config as above. Copy `plugin/opencode/mroute.js` to `~/.config/opencode/plugins/mroute.js` and `plugin/opencode/lib/route-core.mjs` to `~/.config/opencode/plugins/lib/route-core.mjs` (create the `plugins/lib` directory first), then restart opencode. Local plugins use opencode's `@opencode-ai/plugin` helper.
+
+Ask the agent to use the `route` tool with a prompt to launch a **separate one-shot task** via `mroute run`; its output is returned to the agent. The `recommend` tool runs `mroute route --json`, shows a toast and appends the recommendation to the TUI prompt when those surfaces are available. The recommendation also appears in the tool result if the TUI is unavailable. Neither tool switches the model of the active conversation. The configured Jev backend sends the bounded preview described under Configuration and privacy; use `heuristics` for offline routing. Run `node --test plugin/opencode/route.test.mjs` to exercise the local tool fixture.
+
 ## M1 routing evaluation
 
 Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired backend configured. The 40 cases are hand-labeled examples of mechanical and complex coding tasks, not a representative production sample. On 2026-09-23, the starter target catalogue produced:
