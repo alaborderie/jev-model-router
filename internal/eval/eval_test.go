@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"testing"
@@ -31,5 +32,17 @@ func TestCasesAndMetrics(t *testing.T) {
 	}
 	if report.TargetAccuracy != 0.5 || report.EffortWithinBand != 0.5 || report.Confusion["big"]["small"] != 1 {
 		t.Fatalf("bad report %+v", report)
+	}
+}
+
+func TestWriteTableIncludesConfiguredBackendAndModel(t *testing.T) {
+	report := Report{Backend: "jev", Model: "jev-latest", Cases: 40, TargetAccuracy: 0.925, EffortWithinBand: 0.95}
+	var out bytes.Buffer
+	if err := WriteTable(&out, report); err != nil {
+		t.Fatal(err)
+	}
+	want := "| Backend | Model | Cases | Target accuracy | Effort within band |\n| --- | --- | ---: | ---: | ---: |\n| jev | jev-latest | 40 | 92.5% | 95.0% |\n"
+	if out.String() != want {
+		t.Fatalf("table = %q, want %q", out.String(), want)
 	}
 }

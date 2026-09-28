@@ -1,0 +1,24 @@
+# Reproducible offline baseline for `mroute eval --table --config eval/heuristics.toml`.
+[classifier]
+backend = "heuristics"
+confidence_gate = 0.60
+timeout_ms = 2000
+preview_bytes = 8000
+
+[routing]
+safe_target = "claude-opus"
+default_engine = "claude"
+
+[[target]]
+id = "claude-haiku"
+engine = "claude"
+model = "claude-haiku-4-5"
+efforts = ["low", "medium"]
+when = "mechanical edits, renames, formatting, single-file lookups"
+
+[[target]]
+id = "claude-opus"
+engine = "claude"
+model = "claude-opus-4-6"
+efforts = ["medium", "high", "xhigh", "max"]
+when = "debugging, architecture, multi-file refactors, ambiguous tasks"

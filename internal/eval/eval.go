@@ -21,6 +21,7 @@ type Case struct {
 }
 type Report struct {
 	Backend          string                    `json:"backend"`
+	Model            string                    `json:"model"`
 	Cases            int                       `json:"cases"`
 	TargetAccuracy   float64                   `json:"target_accuracy"`
 	EffortWithinBand float64                   `json:"effort_within_band"`
@@ -54,6 +55,14 @@ func Load(path string) ([]Case, error) {
 }
 func Run(ctx context.Context, r router.Runner, cases []Case) (Report, error) {
 	report := Report{Backend: r.Config.Classifier.Backend, Cases: len(cases), Confusion: map[string]map[string]int{}, Outcomes: map[string]int{}, GeneratedAt: time.Now().UTC()}
+	switch report.Backend {
+	case "jev":
+		report.Model = r.Config.Classifier.Jev.Model
+	case "openai":
+		report.Model = r.Config.Classifier.OpenAI.Model
+	default:
+		report.Model = "built-in"
+	}
 	if len(cases) == 0 {
 		return report, fmt.Errorf("eval set is empty")
 	}
@@ -91,6 +100,11 @@ func Run(ctx context.Context, r router.Runner, cases []Case) (Report, error) {
 	return report, nil
 }
 func Write(w io.Writer, r Report) error {
-	_, err := fmt.Fprintf(w, "Backend: %s\nCases: %d\nTarget accuracy: %.1f%%\nEffort within band: %.1f%%\nClassifier p50: %d ms\nClassifier p95: %d ms\nOutcomes: %v\n", r.Backend, r.Cases, 100*r.TargetAccuracy, 100*r.EffortWithinBand, r.P50LatencyMS, r.P95LatencyMS, r.Outcomes)
+	_, err := fmt.Fprintf(w, "Backend: %s\nModel: %s\nCases: %d\nTarget accuracy: %.1f%%\nEffort within band: %.1f%%\nClassifier p50: %d ms\nClassifier p95: %d ms\nOutcomes: %v\n", r.Backend, r.Model, r.Cases, 100*r.TargetAccuracy, 100*r.EffortWithinBand, r.P50LatencyMS, r.P95LatencyMS, r.Outcomes)
+	return err
+}
+
+func WriteTable(w io.Writer, r Report) error {
+	_, err := fmt.Fprintf(w, "| Backend | Model | Cases | Target accuracy | Effort within band |\n| --- | --- | ---: | ---: | ---: |\n| %s | %s | %d | %.1f%% | %.1f%% |\n", r.Backend, r.Model, r.Cases, 100*r.TargetAccuracy, 100*r.EffortWithinBand)
 	return err
 }

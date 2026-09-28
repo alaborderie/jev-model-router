@@ -26,3 +26,10 @@ func TestRoutePromptArguments(t *testing.T) {
 		})
 	}
 }
+
+func TestEvalArgumentsForReproducibleConfig(t *testing.T) {
+	casePath, configPath, table, err := evalArgs([]string{"--table", "--config", "eval/heuristics.toml", "eval/cases.jsonl"})
+	if err != nil || casePath != "eval/cases.jsonl" || configPath != "eval/heuristics.toml" || !table {
+		t.Fatalf("eval args: %q %q %v %v", casePath, configPath, table, err)
+	}
+}
