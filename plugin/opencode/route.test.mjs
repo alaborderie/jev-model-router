@@ -36,3 +36,27 @@ test("blank prompts are rejected before executing", async () => {
   const tools = createRouteTools(tool, {}, binary)
   await assert.rejects(() => tools.route.execute({ prompt: "   " }, { directory: process.cwd() }), /prompt is required/)
 })
+
+test("a delegated task can outlive the recommendation budget", async () => {
+  const tools = createRouteTools(tool, {}, binary)
+  await assert.rejects(() => tools.recommend.execute({ prompt: "slow" }, { directory: process.cwd() }), /timed out|timeout/i)
+  assert.deepEqual(JSON.parse(await tools.route.execute({ prompt: "slow" }, { directory: process.cwd() })), ["run", "slow"])
+})
+
+test("large delegated output is truncated without killing the task", async () => {
+  const tools = createRouteTools(tool, {}, binary)
+  const output = await tools.route.execute({ prompt: "large" }, { directory: process.cwd() })
+  assert.ok(output.startsWith("xxx"))
+  assert.match(output, /output truncated/)
+  assert.ok(output.length < 11 * 1024 * 1024)
+})
+
+test("cancelling the tool stops its delegated process", async () => {
+  const tools = createRouteTools(tool, {}, binary)
+  const controller = new AbortController()
+  const started = Date.now()
+  const pending = tools.route.execute({ prompt: "slow" }, { directory: process.cwd(), abort: controller.signal })
+  setTimeout(() => controller.abort(), 100)
+  await assert.rejects(pending, /abort|cancel/i)
+  assert.ok(Date.now() - started < 1500, "cancellation should not wait for the slow task")
+})
