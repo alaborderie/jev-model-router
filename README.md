@@ -4,7 +4,11 @@
 
 The container image runs `mroute serve` on port 8080. `GET /` serves the static landing page, `/styles.css` serves its stylesheet, and `GET /healthz` returns 200. The page and CSS are embedded in the binary, so no runtime asset directory is required. The server does not accept prompts, expose a routing API, or use a TypeSafe key. To route work, install and run the CLI locally.
 
+On a push to `main`, the image workflow requires the four `VPS_SSH_*` secrets, publishes GHCR `latest` and SHA tags, then SSHes to the VPS to restart `deployment/f-0923-jev-model-router` in namespace `default` and wait up to 120 seconds for rollout. The deployment must already exist; the workflow does not apply infrastructure manifests. Publishing and deployment are serialized, and a failed publish prevents deployment.
+
 ## Install and quick start
+
+This repository is a **private preview**. Installation, GitHub documentation, and issue links require repository access; anonymous visitors receive a GitHub 404. The commands below are for the owner and authorized collaborators with authenticated Git access and `GOPRIVATE=github.com/alaborderie/f-0923-jev-model-router` configured. There is no anonymous download or signup yet.
 
 Prerequisites: Go 1.27 or newer and at least one installed and authenticated engine CLI (`claude`, `opencode`, or `codex`).
 

@@ -23,6 +23,9 @@ nav { display: flex; flex-wrap: wrap; gap: 16px; }
 nav a, .brand { text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
 .brand { font: 700 24px ui-monospace, monospace; }
 .brand span, h1 span, .prompt { color: var(--accent); }
+.access-notice { padding: 20px 24px; margin-top: 32px; border: 1px solid var(--focus); background: var(--panel); }
+.access-notice h2 { font-size: 18px; margin: 0 0 12px; }
+.access-notice p { margin: 0; color: var(--muted); }
 .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; padding: 88px 0 64px; align-items: center; }
 .eyebrow, .terminal-label { font: 12px ui-monospace, monospace; letter-spacing: .09em; color: var(--muted); }
 h1 { font-size: clamp(40px, 5.3vw, 64px); line-height: 1.08; letter-spacing: -.045em; margin: 24px 0; }

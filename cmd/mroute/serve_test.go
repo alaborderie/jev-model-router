@@ -50,6 +50,16 @@ func TestLandingAssets(t *testing.T) {
 	}
 }
 
+func TestLandingDisclosesPrivateAccess(t *testing.T) {
+	r := httptest.NewRecorder()
+	healthHandler().ServeHTTP(r, httptest.NewRequest("GET", "/", nil))
+	for _, notice := range []string{"Private preview", "Repository access required", "Private docs", "Private GitHub", "Private issues", "Anonymous visitors will see a GitHub 404"} {
+		if !strings.Contains(r.Body.String(), notice) {
+			t.Errorf("landing missing access notice %q", notice)
+		}
+	}
+}
+
 func TestPublicServerHeadAndMethods(t *testing.T) {
 	server := httptest.NewServer(healthHandler())
 	defer server.Close()
