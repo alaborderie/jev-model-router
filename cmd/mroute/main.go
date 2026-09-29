@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -20,7 +21,7 @@ func main() {
 }
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: mroute init|route|run|log|explain|eval|doctor")
+		return fmt.Errorf("usage: mroute init|route|run|log|explain|eval|doctor|serve")
 	}
 	if args[0] == "init" {
 		if len(args) > 2 || (len(args) == 2 && args[1] != "--force") {
@@ -35,6 +36,12 @@ func run(args []string) error {
 		}
 		fmt.Println(path)
 		return nil
+	}
+	if args[0] == "serve" {
+		if len(args) != 1 {
+			return fmt.Errorf("usage: mroute serve")
+		}
+		return http.ListenAndServe(":8080", healthHandler())
 	}
 	if args[0] == "mcp" {
 		if len(args) != 1 {
