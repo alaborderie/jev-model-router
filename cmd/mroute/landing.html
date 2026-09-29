@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="mroute selects a configured coding CLI, model, and effort for a separate one-shot task. Inspect the decision, then run it locally.">
+  <title>mroute — inspect the route, then run</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header>
+    <a class="brand" href="/">mroute<span aria-hidden="true"> ▸</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#install">Install</a>
+      <a href="https://github.com/alaborderie/f-0923-jev-model-router#readme">Docs</a>
+      <a href="https://github.com/alaborderie/f-0923-jev-model-router">GitHub ↗</a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero" aria-labelledby="title">
+      <div>
+        <p class="eyebrow">LOCAL CLI / CLAUDE · OPENCODE · CODEX</p>
+        <h1 id="title">Inspect the route.<br><span>Then run.</span></h1>
+        <p class="intro">Choose a coding CLI, model, and effort for the task in front of you. See the recommendation before launching a separate one-shot task.</p>
+        <div class="actions"><a class="button" href="#install">Start locally →</a><a href="https://github.com/alaborderie/f-0923-jev-model-router#configuration-and-privacy">How routing works ↗</a></div>
+        <p class="note">Your active conversation keeps its model. Your engine CLI keeps its authentication.</p>
+      </div>
+      <div class="terminal">
+        <p class="terminal-label">A LOCAL WORKFLOW</p>
+        <pre tabindex="0" aria-label="Example local commands"><code><span class="comment"># Inspect a recommendation</span>
+<span class="prompt">$</span> mroute route "Explain this error"
+
+<span class="comment"># Launch a separate task</span>
+<span class="prompt">$</span> mroute run "Explain this error"
+
+<span class="comment"># Inspect the latest decision</span>
+<span class="prompt">$</span> mroute explain
+
+<span class="comment"># Review decision history</span>
+<span class="prompt">$</span> mroute log</code></pre>
+      </div>
+    </section>
+    <section class="features" aria-label="Routing boundaries">
+      <article><p class="eyebrow">01 / YOUR CATALOGUE</p><h2>You define the targets.</h2><p>Configure engines, models, supported efforts, and task descriptions. mroute selects from that catalogue, not an invisible list.</p></article>
+      <article><p class="eyebrow">02 / VISIBLE DECISIONS</p><h2>Review, then delegate.</h2><p>Use <code>route</code> without launching an engine. Use <code>explain</code> and <code>log</code> to inspect decisions. Low confidence or classifier failure uses your configured safe target.</p></article>
+      <article><p class="eyebrow">03 / LOCAL EXECUTION</p><h2>No hosted prompt endpoint.</h2><p>This site is documentation only. The default Jev classifier sends a bounded prompt preview to TypeSafe; choose <code>heuristics</code> for offline classification.</p></article>
+    </section>
+    <section class="install" id="install" aria-labelledby="install-title">
+      <div><p class="eyebrow">GET STARTED</p><h2 id="install-title">Bring your own coding CLI.</h2><p>Requires Go 1.27 or newer and an installed, authenticated <code>claude</code>, <code>opencode</code>, or <code>codex</code> CLI.</p><p>After initialization, review your targets in <code>~/.config/mroute/config.toml</code>. Set <code>TYPESAFE_API_KEY</code> in your environment for Jev, or set <code>classifier.backend = "heuristics"</code> to classify offline.</p></div>
+      <pre tabindex="0" aria-label="Installation commands"><code>go install github.com/alaborderie/f-0923-jev-model-router/cmd/mroute@latest
+mroute init
+<span class="comment"># Review config and choose your classifier first</span>
+mroute doctor
+mroute route "Explain this error"</code></pre>
+    </section>
+    <section class="more" aria-labelledby="plugins-title"><h2 id="plugins-title">Use it from your existing tools.</h2><p>Claude Code and opencode integrations recommend or delegate separate tasks. They do not silently switch the model in an active session.</p><a href="https://github.com/alaborderie/f-0923-jev-model-router#claude-code-plugin">Claude Code setup ↗</a><a href="https://github.com/alaborderie/f-0923-jev-model-router#opencode-plugin">opencode setup ↗</a></section>
+  </main>
+  <footer><span>mroute / local routing, inspectable decisions</span><a href="https://github.com/alaborderie/f-0923-jev-model-router/issues">Report an issue ↗</a></footer>
+</body>
+</html>

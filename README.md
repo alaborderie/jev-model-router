@@ -2,7 +2,7 @@
 
 `mroute` chooses a user-configured coding CLI, model, and effort for a prompt, then launches that CLI for a **one-shot** task. It does not change the model in an active conversation. The engine CLI keeps its own authentication; mroute does not proxy or store provider credentials.
 
-The container image runs `mroute serve`, a health-only HTTP process on port 8080. `GET /healthz` returns 200; it does not accept prompts, expose a routing API, or use a TypeSafe key. To route work, install and run the CLI locally.
+The container image runs `mroute serve` on port 8080. `GET /` serves the static landing page, `/styles.css` serves its stylesheet, and `GET /healthz` returns 200. The page and CSS are embedded in the binary, so no runtime asset directory is required. The server does not accept prompts, expose a routing API, or use a TypeSafe key. To route work, install and run the CLI locally.
 
 ## Install and quick start
 
