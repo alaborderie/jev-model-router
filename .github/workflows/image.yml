@@ -62,4 +62,4 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y sshpass
           sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -p "$VPS_SSH_PORT" "$VPS_SSH_USER@$VPS_SSH_IP" \
-            'kubectl -n default rollout restart deployment/f-0923-jev-model-router && kubectl -n default rollout status deployment/f-0923-jev-model-router --timeout=120s'
+            'sudo -n kubectl -n default rollout restart deployment/f-0923-jev-model-router && sudo -n kubectl -n default rollout status deployment/f-0923-jev-model-router --timeout=120s'
