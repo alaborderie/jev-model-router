@@ -10,12 +10,13 @@ On a push to `main`, the image workflow requires the four `VPS_SSH_*` secrets, p
 
 This repository is a **private preview**. Installation, GitHub documentation, and issue links require repository access; anonymous visitors receive a GitHub 404. The commands below are for the owner and authorized collaborators with authenticated Git access and `GOPRIVATE=github.com/alaborderie/f-0923-jev-model-router` configured. There is no anonymous download or signup yet.
 
-Prerequisites: Go 1.27 or newer and at least one installed and authenticated engine CLI (`claude`, `opencode`, or `codex`).
+Prerequisites: Go 1.27.1 or newer and at least one installed and authenticated engine CLI (`claude`, `opencode`, or `codex`).
 
 ```sh
 go install github.com/alaborderie/f-0923-jev-model-router/cmd/mroute@latest
 mroute init
-# Review ~/.config/mroute/config.toml and set TYPESAFE_API_KEY for Jev.
+# Review ~/.config/mroute/config.toml: offline heuristics without a key.
+mroute doctor
 mroute route "Explain this error"
 mroute run "Explain this error"
 ```
@@ -26,9 +27,9 @@ Use `mroute route --json "Explain this error"` for a JSON recommendation. To rou
 
 ## Configuration and privacy
 
-`mroute init` creates `$XDG_CONFIG_HOME/mroute/config.toml`, or `~/.config/mroute/config.toml` when XDG_CONFIG_HOME is unset. It refuses to overwrite the file; use `mroute init --force` to replace it. Each `[[target]]` declares an engine, model, supported efforts, and a short routing description. Claude targets cannot include `none` because the Claude CLI does not accept it. `routing.safe_target` identifies the fallback when classification is uncertain or fails.
+`mroute init` creates `$XDG_CONFIG_HOME/mroute/config.toml`, or `~/.config/mroute/config.toml` when XDG_CONFIG_HOME is unset. It selects offline `heuristics` when `TYPESAFE_API_KEY` is unset or empty and `jev` when present. Existing files are unchanged when the environment changes. It refuses to overwrite the file; use `mroute init --force` to replace it. Each `[[target]]` declares an engine, model, supported efforts, and a short routing description. Claude targets cannot include `none` because the Claude CLI does not accept it. `routing.safe_target` identifies the fallback when classification is uncertain or fails.
 
-The default `jev` classifier sends a bounded prompt preview (at most `classifier.preview_bytes`, initially 8000 bytes) to TypeSafe. Set `TYPESAFE_API_KEY` in the environment, not the config. Set `classifier.backend = "heuristics"` for offline routing without a key or network. `openai` can use a local OpenAI-compatible endpoint. Full prompts and keys are not written to route logs.
+The optional `jev` classifier sends a bounded prompt preview (at most `classifier.preview_bytes`, initially 8000 bytes) to TypeSafe. Set `TYPESAFE_API_KEY` in the environment, not the config. Set `classifier.backend = "heuristics"` for offline routing without a key or network. `openai` can use a local OpenAI-compatible endpoint. Full prompts and keys are not written to route logs.
 
 The CLI runs only one task at a time. Plugin recommendations in later milestones will not silently switch the model in an existing Claude Code or opencode session.
 
@@ -43,11 +44,11 @@ claude plugin install mroute@mroute-marketplace
 
 Restart Claude Code, then use `/mroute:route Explain this error` for a separate one-shot task. The plugin passes the prompt to the local `mroute` tool as structured data, which launches `mroute run`; it does not change the model of the current conversation. If the command is missing, confirm `mroute` is on Claude Code's `PATH` and that `mroute init` has created a config.
 
-Installing and enabling the plugin also opts in to its `UserPromptSubmit` recommendation hook. The hook calls `mroute route` with a hard 1.8-second routing deadline (2 seconds at the Claude hook boundary), based on M1's 360 ms Jev p95. It adds a one-line recommendation to Claude's context; it does not switch models. If the CLI is missing, classification fails, or the deadline expires, it emits nothing and lets the prompt continue. To disable the hook, disable the plugin with `claude plugin disable mroute@mroute-marketplace`. The default Jev backend sends the bounded prompt preview described above on each prompt; select `heuristics` in the config for an offline hook.
+Installing and enabling the plugin also opts in to its `UserPromptSubmit` recommendation hook. The hook calls `mroute route` with a hard 1.8-second routing deadline (2 seconds at the Claude hook boundary), based on M1's 360 ms Jev p95. It adds a one-line recommendation to Claude's context; it does not switch models. If the CLI is missing, classification fails, or the deadline expires, it emits nothing and lets the prompt continue. To disable the hook, disable the plugin with `claude plugin disable mroute@mroute-marketplace`. The Jev backend sends the bounded prompt preview described above on each prompt; select `heuristics` in the config for an offline hook.
 
 For Claude `Agent`/legacy `Task` subagent spawns, the plugin can set the subagent model to the routed Claude family (`haiku`, `sonnet`, or `opus`). It leaves an explicitly chosen model alone and skips unsupported event shapes, non-Claude targets, and classifier failures. The subagent gets a model for its own task; the active conversation never changes models mid-turn. Its `PreToolUse` hook shares the same 1.8-second routing deadline. Both hooks are enabled with the plugin and can be turned off by disabling it.
 
-The config at `$XDG_CONFIG_HOME/mroute/config.toml` controls all plugin paths. `classifier.backend` chooses `jev`, `openai`, or `heuristics`; `classifier.confidence_gate`, `timeout_ms`, and `preview_bytes` control classification. `routing.safe_target` is the fallback target. Each `[[target]]` supplies `id`, `engine`, `model`, `efforts`, and `when`. The TypeSafe key belongs in `TYPESAFE_API_KEY` in the environment. If you use the default Jev backend, the prompt hook sends a bounded preview of each submitted prompt to TypeSafe; `heuristics` sends nothing over the network.
+The config at `$XDG_CONFIG_HOME/mroute/config.toml` controls all plugin paths. `classifier.backend` chooses `jev`, `openai`, or `heuristics`; `classifier.confidence_gate`, `timeout_ms`, and `preview_bytes` control classification. `routing.safe_target` is the fallback target. Each `[[target]]` supplies `id`, `engine`, `model`, `efforts`, and `when`. The TypeSafe key belongs in `TYPESAFE_API_KEY` in the environment. If you use the Jev backend, the prompt hook sends a bounded preview of each submitted prompt to TypeSafe; `heuristics` sends nothing over the network.
 
 ## opencode plugin
 
@@ -74,7 +75,7 @@ Jev passed the M1 gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms
 
 | Field | Starter value | Meaning |
 | --- | --- | --- |
-| `classifier.backend` | `jev` | `jev`, `openai`, or offline `heuristics` |
+| `classifier.backend` | `heuristics` without a key; `jev` with a key | `jev`, `openai`, or offline `heuristics` |
 | `classifier.confidence_gate` | `0.60` | Choice confidence below this 0–1 threshold routes to the safe target |
 | `classifier.timeout_ms` | `2000` | Positive classifier deadline in milliseconds |
 | `classifier.preview_bytes` | `8000` | Maximum prompt preview bytes sent to a classifier (1–32768) |
@@ -89,7 +90,7 @@ Jev passed the M1 gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms
 | `[[target]].efforts` | `low, medium` / `medium, high, xhigh, max` | Supported efforts (`none`, `low`, `medium`, `high`, `xhigh`, `max`); Claude excludes `none` |
 | `[[target]].when` | task descriptions in starter config | Routing rubric for each target |
 
-The default Jev backend sends at most `classifier.preview_bytes` of each prompt to TypeSafe. Use `heuristics` for no-network classification or a local `openai` endpoint for a local model; the engine CLI owns its own authentication. Full prompts and keys are not logged.
+The Jev backend sends at most `classifier.preview_bytes` of each prompt to TypeSafe. Use `heuristics` for no-network classification or a local `openai` endpoint for a local model; the engine CLI owns its own authentication. Full prompts and keys are not logged.
 
 ## Engine capability check
 
@@ -100,3 +101,12 @@ claude: supported (required flags: -p, --model, --effort)
 ```
 
 Claude needs `-p`, `--model`, and `--effort`; opencode needs `run -m --variant`; Codex needs `exec -m -c`. A missing binary reports `command unavailable`; an older CLI whose help lacks a required flag reports e.g. `opencode: missing --variant (required flags: -m, --variant)` and `mroute doctor` exits nonzero. Update the engine CLI or choose supported targets before launching routed work.
+
+## Website, license and publication
+
+[Public preview and routing walkthrough](https://jev-model-router.antoinelaborderie.com/).
+The source is prepared under the [MIT license](LICENSE). This does not make the
+private repository anonymously accessible. See [publication checklist](distribution/publication.md)
+for release commands, access checks and the remaining owner approvals.
+[Offline route receipt](distribution/offline-receipt.md) documents a local run;
+no hosted classifier call or engine task was executed to capture it.
