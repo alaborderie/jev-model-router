@@ -44,8 +44,10 @@ copy until anonymous source, docs and installation have actually passed.
    Configure supported model IDs in the catalogue. The founder then runs one
    `mroute run -- 'Explain a small local function'` with their authenticated engine;
    that may use their subscription or incur charges and is not an agent smoke test.
-5. Only after step 4, remove private-preview labels and GOPRIVATE instructions in
-   a reviewed page/docs change; use the verified release tag in public installs.
+5. Only after step 4, apply `git apply distribution/public-access.patch` on a new
+   branch and open a reviewed page/docs PR. This prepared patch removes preview
+   labels/GOPRIVATE instructions and pins installs to the verified v0.1.0 tag.
+   Run `git apply --check` first; if a different tag was selected, update the patch.
    The current labels are deliberately true while this preparation PR is open.
 6. Submit only the approved channel drafts. Refresh upstream ecosystem patch
    against `dev` immediately before opening an upstream PR. No marketing issue
