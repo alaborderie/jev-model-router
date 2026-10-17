@@ -1,8 +1,6 @@
-diff --git a/packages/web/src/content/docs/ecosystem.mdx b/packages/web/src/content/docs/ecosystem.mdx
 --- a/packages/web/src/content/docs/ecosystem.mdx
 +++ b/packages/web/src/content/docs/ecosystem.mdx
-@@ -18,3 +18,4 @@
- | Name                                                                                               | Description                                                                                        |
- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
- | [opencode-daytona](https://github.com/daytona/integrations/tree/main/packages/opencode-plugin)     | Automatically run OpenCode sessions in isolated Daytona sandboxes with git sync and live previews  |
-+| [mroute](https://github.com/alaborderie/f-0923-jev-model-router)                                   | Local one-shot model and effort routing for opencode, Claude Code, and Codex CLIs                   |
+@@ -19,2 +19,3 @@
+ | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
++| [mroute](https://github.com/alaborderie/f-0923-jev-model-router) | Local one-shot model/effort routing with explicit route and recommend tools; does not switch the active session model |
+ | [opencode-daytona](https://github.com/daytona/integrations/tree/main/packages/opencode-plugin)     | Automatically run OpenCode sessions in isolated Daytona sandboxes with git sync and live previews                                |

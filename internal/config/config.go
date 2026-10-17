@@ -100,7 +100,11 @@ func Init(path string, overwrite bool) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(Starter)
+	starter := Starter
+	if os.Getenv("TYPESAFE_API_KEY") == "" {
+		starter = strings.Replace(starter, "\nbackend = \"jev\"", "\nbackend = \"heuristics\"", 1)
+	}
+	_, err = f.WriteString(starter)
 	return err
 }
 func Load(path string) (Config, error) {
