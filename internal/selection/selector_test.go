@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"testing"
 )
 
@@ -53,12 +54,12 @@ func wantNulls(t *testing.T, got Response) {
 
 func TestEmptySkipsClassifier(t *testing.T) {
 	f := &countingClassifier{}
-	got := (Selector{Classifier: f, ConfidenceGate: 0.60}).Select(context.Background(), Request{})
+	got := (Selector{Classifier: f}).Select(context.Background(), Request{})
 	if got.Status != "abstained" || got.Reason != "no_candidates" || f.calls != 0 {
 		t.Fatalf("unexpected empty-set outcome: %#v calls=%d", got, f.calls)
 	}
 	req := decodeFixture(t, "empty.json")
-	got = (Selector{Classifier: f, ConfidenceGate: 0.60}).Select(context.Background(), req)
+	got = (Selector{Classifier: f}).Select(context.Background(), req)
 	checkIdentity(t, req, got)
 	wantNulls(t, got)
 	if got.Status != StatusAbstained || got.Reason != ReasonNoCandidates || got.LatencyMS != 0 || f.calls != 0 {
@@ -69,7 +70,7 @@ func TestEmptySkipsClassifier(t *testing.T) {
 func TestSingletonSkipsClassifier(t *testing.T) {
 	req := decodeFixture(t, "singleton.json")
 	for _, c := range []Classifier{&countingClassifier{}, nil} {
-		got := (Selector{Classifier: c, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+		got := (Selector{Classifier: c}).Select(context.Background(), req)
 		checkIdentity(t, req, got)
 		if got.Status != StatusSelected || got.Reason != ReasonSingleton || got.CandidateID == nil || *got.CandidateID != req.Candidates[0].CandidateID {
 			t.Fatalf("unexpected singleton outcome: %#v", got)
@@ -86,7 +87,7 @@ func TestSingletonSkipsClassifier(t *testing.T) {
 func TestSelectCallsClassifierExactlyOnce(t *testing.T) {
 	req := decodeFixture(t, "unicode.json")
 	f := &countingClassifier{}
-	got := (Selector{Classifier: f, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+	got := (Selector{Classifier: f}).Select(context.Background(), req)
 	checkIdentity(t, req, got)
 	wantNulls(t, got)
 	if f.calls != 1 || got.Status != StatusError || got.Reason != ReasonNetwork {
@@ -96,7 +97,7 @@ func TestSelectCallsClassifierExactlyOnce(t *testing.T) {
 
 func TestSelectNilClassifierIsInvalidRequest(t *testing.T) {
 	req := decodeFixture(t, "unicode.json")
-	got := (Selector{ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+	got := (Selector{}).Select(context.Background(), req)
 	checkIdentity(t, req, got)
 	wantNulls(t, got)
 	if got.Status != StatusError || got.Reason != ReasonInvalidRequest {
@@ -111,7 +112,7 @@ func TestConfidenceGate(t *testing.T) {
 		status, reason string
 	}{{0.59, StatusAbstained, ReasonLowConfidence}, {0.5999, StatusAbstained, ReasonLowConfidence}, {0, StatusAbstained, ReasonLowConfidence}, {0.60, StatusSelected, ReasonClassified}, {1, StatusSelected, ReasonClassified}} {
 		f := &fakeClassifier{resp: inference("cand-b", tc.conf)}
-		got := (Selector{Classifier: f, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+		got := (Selector{Classifier: f}).Select(context.Background(), req)
 		checkIdentity(t, req, got)
 		if f.calls != 1 || got.Status != tc.status || got.Reason != tc.reason {
 			t.Fatalf("conf %v: %#v calls=%d", tc.conf, got, f.calls)
@@ -123,9 +124,8 @@ func TestConfidenceGate(t *testing.T) {
 			t.Fatalf("conf %v: candidate_id %v", tc.conf, got.CandidateID)
 		}
 	}
-	got := (Selector{Classifier: &fakeClassifier{resp: inference("cand-b", 0.59)}}).Select(context.Background(), req)
-	if got.Reason != ReasonLowConfidence {
-		t.Fatalf("zero gate must default to ConfidenceGate: %#v", got)
+	if n := reflect.TypeOf(Selector{}).NumField(); n != 1 || ConfidenceGate != 0.60 {
+		t.Fatalf("the 0.60 gate is a protocol constant, not configuration: %d fields", n)
 	}
 }
 
@@ -147,7 +147,7 @@ func TestSelectRejectsInvalidClassifierOutput(t *testing.T) {
 		"no_model": noModel, "no_confidence": noConf, "no_id": noID, "bad_model": badModel, "negative_usage": negUsage,
 	} {
 		f := &fakeClassifier{resp: resp}
-		got := (Selector{Classifier: f, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+		got := (Selector{Classifier: f}).Select(context.Background(), req)
 		checkIdentity(t, req, got)
 		wantNulls(t, got)
 		if f.calls != 1 || got.Status != StatusError || got.Reason != ReasonInvalidResponse {
@@ -170,7 +170,7 @@ func TestSelectErrorReasons(t *testing.T) {
 	}
 	for want, err := range cases {
 		f := &fakeClassifier{resp: inference("cand-a", 0.9), err: err}
-		got := (Selector{Classifier: f, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+		got := (Selector{Classifier: f}).Select(context.Background(), req)
 		checkIdentity(t, req, got)
 		wantNulls(t, got)
 		if f.calls != 1 || got.Status != StatusError || got.Reason != want {

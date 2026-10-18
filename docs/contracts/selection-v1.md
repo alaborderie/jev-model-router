@@ -179,7 +179,11 @@ One `choice` question keyed `candidate`. Criteria map each `candidate_id` to its
 version and `role_brief`. TypeSafe `state` is
 `{"role_policy_version": …, "venture_state": <state>}`. No effort score is asked.
 The returned `model` must equal the pin; `choice` must be an in-request ID;
-`confidence` must be finite in [0, 1].
+`confidence` must be finite in [0, 1] (`-0` is normalized to `0`). The 200 body is
+read up to 1 MiB and parsed with the same strict rules as the request (no duplicate
+keys, trailing data, BOM, invalid UTF-8 or unpaired surrogates), with exact,
+case-sensitive key matching; unknown provider fields are ignored. Any violation is
+`invalid_response`. Redirects are never followed: a 3xx is `network`.
 
 ## Fixtures
 

@@ -19,9 +19,9 @@ type Classifier interface {
 	Choose(context.Context, Request) (Response, error)
 }
 
+// Selector applies the protocol-v1 ConfidenceGate; the gate is not configurable.
 type Selector struct {
-	Classifier     Classifier
-	ConfidenceGate float64
+	Classifier Classifier
 }
 
 // Select answers a validated request. It calls the classifier at most once and never falls back.
@@ -39,10 +39,6 @@ func (s Selector) Select(ctx context.Context, req Request) Response {
 	if s.Classifier == nil {
 		return failed(resp, ReasonInvalidRequest)
 	}
-	gate := s.ConfidenceGate
-	if gate == 0 {
-		gate = ConfidenceGate
-	}
 	start := time.Now()
 	got, err := s.Classifier.Choose(ctx, req)
 	resp.LatencyMS = time.Since(start).Milliseconds()
@@ -58,7 +54,7 @@ func (s Selector) Select(ctx context.Context, req Request) Response {
 		return failed(resp, ReasonInvalidResponse)
 	}
 	resp.Confidence, resp.SelectorModel, resp.Usage = clone(got.Confidence), clone(got.SelectorModel), clone(got.Usage)
-	if resp.Confidence != nil && *resp.Confidence < gate {
+	if resp.Confidence != nil && *resp.Confidence < ConfidenceGate {
 		resp.Status, resp.Reason = StatusAbstained, ReasonLowConfidence
 	} else {
 		resp.Status, resp.Reason, resp.CandidateID = StatusSelected, ReasonClassified, clone(got.CandidateID)

@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alaborderie/f-0923-jev-model-router/internal/classifier"
 )
@@ -24,12 +25,13 @@ const (
 )
 
 // Jev asks TypeSafe Jev one choice question. URL and APIKey are injected by trusted code only.
+// Client may supply a transport; redirects are never followed regardless of its CheckRedirect.
 type Jev struct {
 	Client  *http.Client
 	URL     string
 	APIKey  string
 	Model   string
-	Timeout time.Duration
+	timeout time.Duration // 0 means the protocol's 2 s HTTP deadline; set only by in-package tests
 }
 
 type jevQuestionBody struct {
@@ -51,15 +53,6 @@ type jevPayload struct {
 	Model     string                     `json:"model"`
 	Questions map[string]jevQuestionBody `json:"questions"`
 }
-type jevReply struct {
-	Model   *string `json:"model"`
-	Answers map[string]struct {
-		Type       string   `json:"type"`
-		Choice     *string  `json:"choice"`
-		Confidence *float64 `json:"confidence"`
-	} `json:"answers"`
-	Usage json.RawMessage `json:"usage"`
-}
 
 func fail(reason string) (Response, error) { return Response{}, &Error{Reason: reason} }
 
@@ -72,11 +65,11 @@ func (j Jev) url() string {
 
 // Choose performs exactly one HTTP request; it never retries.
 func (j Jev) Choose(ctx context.Context, req Request) (Response, error) {
+	if len(req.Candidates) < 2 || !ValidJevModel(j.Model) {
+		return fail(ReasonInvalidRequest)
+	}
 	if j.APIKey == "" {
 		return fail(ReasonAuthentication)
-	}
-	if !validID(j.Model) {
-		return fail(ReasonInvalidRequest)
 	}
 	criteria := make(map[string]string, len(req.Candidates))
 	for _, c := range req.Candidates {
@@ -96,7 +89,7 @@ func (j Jev) Choose(ctx context.Context, req Request) (Response, error) {
 	}); err != nil {
 		return fail(ReasonInvalidRequest)
 	}
-	timeout := j.Timeout
+	timeout := j.timeout
 	if timeout <= 0 {
 		timeout = jevTimeout
 	}
@@ -108,10 +101,11 @@ func (j Jev) Choose(ctx context.Context, req Request) (Response, error) {
 	}
 	hreq.Header.Set("Authorization", "Bearer "+j.APIKey)
 	hreq.Header.Set("Content-Type", "application/json")
-	client := j.Client
-	if client == nil {
-		client = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	var client http.Client
+	if j.Client != nil {
+		client = *j.Client
 	}
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	res, err := client.Do(hreq)
 	if err != nil {
 		return fail(transportReason(ctx, err))
@@ -131,40 +125,50 @@ func (j Jev) Choose(ctx context.Context, req Request) (Response, error) {
 	return j.parse(req, raw)
 }
 
+// parse reads the 200 body with the same strict parser as Decode (no duplicate keys, trailing data,
+// BOM, invalid UTF-8 or unpaired surrogates) and matches keys exactly. Unknown provider fields are allowed.
 func (j Jev) parse(req Request, raw []byte) (Response, error) {
-	var r jevReply
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	if err := dec.Decode(&r); err != nil {
+	if bytes.HasPrefix(raw, []byte("\xef\xbb\xbf")) || !utf8.Valid(raw) || !pairedSurrogates(raw) {
 		return fail(ReasonInvalidResponse)
 	}
-	if _, err := dec.Token(); err != io.EOF {
+	doc, err := parseDocument(raw)
+	if err != nil {
 		return fail(ReasonInvalidResponse)
 	}
-	a, ok := r.Answers["candidate"]
+	top, _ := doc.(map[string]any)
+	answers, _ := top["answers"].(map[string]any)
+	a, _ := answers["candidate"].(map[string]any)
+	model, okModel := top["model"].(string)
+	typ, _ := a["type"].(string)
+	choice, okChoice := a["choice"].(string)
+	num, okNum := a["confidence"].(json.Number)
+	conf, err := strconv.ParseFloat(string(num), 64)
 	switch {
-	case r.Model == nil || *r.Model != j.Model, !ok, a.Type != "choice", a.Choice == nil,
-		!slices.ContainsFunc(req.Candidates, func(c Candidate) bool { return c.CandidateID == *a.Choice }),
-		a.Confidence == nil || math.IsNaN(*a.Confidence) || *a.Confidence < 0 || *a.Confidence > 1:
+	case !okModel || model != j.Model, typ != "choice", !okChoice,
+		!slices.ContainsFunc(req.Candidates, func(c Candidate) bool { return c.CandidateID == choice }),
+		!okNum || err != nil || math.IsNaN(conf) || conf < 0 || conf > 1:
 		return fail(ReasonInvalidResponse)
 	}
-	return Response{CandidateID: a.Choice, Confidence: a.Confidence, SelectorModel: r.Model, Usage: usage(r.Usage)}, nil
+	if conf == 0 {
+		conf = 0 // normalize -0
+	}
+	return Response{CandidateID: &choice, Confidence: &conf, SelectorModel: &model, Usage: usage(top["usage"])}, nil
 }
 
 // usage is recorded only when both counts are plain nonnegative integers; otherwise it is dropped.
-func usage(raw json.RawMessage) *Usage {
-	var u struct {
-		In  json.RawMessage `json:"input_tokens"`
-		Out json.RawMessage `json:"output_tokens"`
-	}
-	if json.Unmarshal(raw, &u) != nil {
+func usage(v any) *Usage {
+	u, _ := v.(map[string]any)
+	in, _ := u["input_tokens"].(json.Number)
+	out, _ := u["output_tokens"].(json.Number)
+	if !isDigits(string(in)) || !isDigits(string(out)) {
 		return nil
 	}
-	in, err1 := strconv.ParseInt(string(u.In), 10, 64)
-	out, err2 := strconv.ParseInt(string(u.Out), 10, 64)
-	if err1 != nil || err2 != nil || !isDigits(string(u.In)) || !isDigits(string(u.Out)) {
+	i, err1 := strconv.ParseInt(string(in), 10, 64)
+	o, err2 := strconv.ParseInt(string(out), 10, 64)
+	if err1 != nil || err2 != nil {
 		return nil
 	}
-	return &Usage{InputTokens: in, OutputTokens: out}
+	return &Usage{InputTokens: i, OutputTokens: o}
 }
 
 func transportReason(ctx context.Context, err error) string {

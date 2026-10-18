@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -163,7 +164,7 @@ func TestJevTimeout(t *testing.T) {
 		}
 	}
 	j, hits := jevServer(t, slow)
-	j.Timeout = 50 * time.Millisecond
+	j.timeout = 50 * time.Millisecond
 	start := time.Now()
 	_, err := j.Choose(context.Background(), req)
 	wantReason(t, err, ReasonTimeout)
@@ -227,7 +228,8 @@ func TestJevMissingCredentialsOrModelSkipHTTP(t *testing.T) {
 
 func TestJevRejectsInvalidAnswers(t *testing.T) {
 	req := decodeFixture(t, "unicode.json")
-	big := `{"pad":"` + strings.Repeat("x", 1<<20) + `",` + answerJSON(testModel, "cand-a", "0.9")[1:]
+	ok := answerJSON(testModel, "cand-a", "0.9")
+	dupAnswer := `{"model":"jev-1.13.0","answers":{"candidate":{"type":"choice","choice":"cand-a","confidence":0.9},"candidate":{"type":"choice","choice":"cand-b","confidence":0.9}}}`
 	for name, body := range map[string]string{
 		"malformed":        `{"model":`,
 		"empty":            ``,
@@ -250,7 +252,20 @@ func TestJevRejectsInvalidAnswers(t *testing.T) {
 		"conf_huge":        answerJSON(testModel, "cand-a", "1e400"),
 		"conf_missing":     `{"model":"jev-1.13.0","answers":{"candidate":{"type":"choice","choice":"cand-a"}}}`,
 		"choice_not_text":  `{"model":"jev-1.13.0","answers":{"candidate":{"type":"choice","choice":1,"confidence":0.9}}}`,
-		"over_1mib":        big,
+		"over_1mib":        ok + strings.Repeat(" ", 1<<20),
+		"dup_model":        `{"model":"jev-1.13.0",` + ok[1:],
+		"dup_answer":       dupAnswer,
+		"dup_confidence":   strings.Replace(ok, `"confidence":0.9`, `"confidence":0.9,"confidence":0.9`, 1),
+		"dup_usage_field":  strings.Replace(ok, `"input_tokens":512`, `"input_tokens":512,"input_tokens":512`, 1),
+		"upper_model":      strings.Replace(ok, `"model"`, `"MODEL"`, 1),
+		"upper_choice":     strings.Replace(ok, `"choice":"cand-a"`, `"Choice":"cand-a"`, 1),
+		"upper_answers":    strings.Replace(ok, `"answers"`, `"Answers"`, 1),
+		"upper_conf":       strings.Replace(ok, `"confidence"`, `"Confidence"`, 1),
+		"invalid_utf8":     strings.Replace(ok, `"probabilities"`, "\"x\xff\":1,\"probabilities\"", 1),
+		"lone_surrogate":   strings.Replace(ok, `"probabilities"`, `"x\ud800":1,"probabilities"`, 1),
+		"bom":              "\xef\xbb\xbf" + ok,
+		"answers_array":    `{"model":"jev-1.13.0","answers":[]}`,
+		"type_not_string":  strings.Replace(ok, `"type":"choice"`, `"type":1`, 1),
 		"answer_not_obj":   `{"model":"jev-1.13.0","answers":{"candidate":"cand-a"}}`,
 		"model_not_string": `{"model":1,"answers":{"candidate":{"type":"choice","choice":"cand-a","confidence":0.9}}}`,
 	} {
@@ -316,7 +331,7 @@ func TestJevReflectedSecretsNeverLeak(t *testing.T) {
 	for name, h := range cases {
 		j, hits := jevServer(t, h)
 		_, err := j.Choose(context.Background(), req)
-		resp := (Selector{Classifier: j, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+		resp := (Selector{Classifier: j}).Select(context.Background(), req)
 		out, merr := json.Marshal(resp)
 		if merr != nil {
 			t.Fatal(merr)
@@ -343,16 +358,134 @@ func TestJevSelectorEndToEnd(t *testing.T) {
 	req := decodeFixture(t, "unicode.json")
 	for conf, want := range map[string]string{"0.83": ReasonClassified, "0.59": ReasonLowConfidence} {
 		j, hits := jevServer(t, reply(200, answerJSON(testModel, "cand-b", conf)))
-		got := (Selector{Classifier: j, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+		got := (Selector{Classifier: j}).Select(context.Background(), req)
 		checkIdentity(t, req, got)
 		if got.Reason != want || hits.Load() != 1 || *got.SelectorModel != testModel {
 			t.Fatalf("%s: %#v hits=%d", conf, got, hits.Load())
 		}
 	}
 	j, hits := jevServer(t, reply(529, `overloaded`))
-	got := (Selector{Classifier: j, ConfidenceGate: ConfidenceGate}).Select(context.Background(), req)
+	got := (Selector{Classifier: j}).Select(context.Background(), req)
 	checkIdentity(t, req, got)
 	if got.Status != StatusError || got.Reason != ReasonOverloaded || hits.Load() != 1 {
 		t.Fatalf("%#v hits=%d", got, hits.Load())
+	}
+}
+
+func TestJevBodyLimitBoundary(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	ok := answerJSON(testModel, "cand-a", "0.9")
+	for size, wantErr := range map[int]bool{maxJevBodyBytes: false, maxJevBodyBytes + 1: true} {
+		j, _ := jevServer(t, reply(200, ok+strings.Repeat(" ", size-len(ok))))
+		_, err := j.Choose(context.Background(), req)
+		if (err != nil) != wantErr {
+			t.Fatalf("size %d: err=%v", size, err)
+		}
+		if wantErr {
+			wantReason(t, err, ReasonInvalidResponse)
+		}
+	}
+}
+
+func TestJevAllowsUnknownProviderFields(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	body := `{"id":"r1","model":"jev-1.13.0","answers":{"candidate":{"type":"choice","choice":"cand-b","confidence":0.7,"reasoning":{"x":[1,2]}},"extra":{"type":"boolean"}},"usage":{"input_tokens":3,"output_tokens":4,"cached":1}}`
+	j, _ := jevServer(t, reply(200, body))
+	got, err := j.Choose(context.Background(), req)
+	if err != nil || *got.CandidateID != "cand-b" || *got.Confidence != 0.7 || *got.Usage != (Usage{3, 4}) {
+		t.Fatalf("%#v %v", got, err)
+	}
+}
+
+func TestJevNegativeZeroConfidence(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	for _, conf := range []string{"-0", "-0.0", "-0e0"} {
+		j, _ := jevServer(t, reply(200, answerJSON(testModel, "cand-a", conf)))
+		got, err := j.Choose(context.Background(), req)
+		if err != nil || got.Confidence == nil || *got.Confidence != 0 || math.Signbit(*got.Confidence) {
+			t.Fatalf("%s: %#v %v", conf, got, err)
+		}
+		out, _ := json.Marshal(got.Confidence)
+		if string(out) != "0" {
+			t.Fatalf("%s: encoded %s", conf, out)
+		}
+	}
+}
+
+func TestJevNeverFollowsRedirects(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	second, secondHits := jevServer(t, reply(200, answerJSON(testModel, "cand-a", "0.9")))
+	for _, code := range []int{301, 302, 303, 307, 308} {
+		for name, client := range map[string]*http.Client{"default": nil, "injected": {}, "injected_follow": {CheckRedirect: func(*http.Request, []*http.Request) error { return nil }}} {
+			j, hits := jevServer(t, func(w http.ResponseWriter, r *http.Request) {
+				io.Copy(io.Discard, r.Body)
+				http.Redirect(w, r, second.URL, code)
+			})
+			j.Client = client
+			_, err := j.Choose(context.Background(), req)
+			wantReason(t, err, ReasonNetwork)
+			if hits.Load() != 1 || secondHits.Load() != 0 {
+				t.Fatalf("%d %s: hits=%d second=%d", code, name, hits.Load(), secondHits.Load())
+			}
+			if client != nil && client.CheckRedirect != nil && name == "injected" {
+				t.Fatalf("%s: injected client mutated", name)
+			}
+		}
+	}
+}
+
+type deadlineProbe struct {
+	deadline time.Time
+	ok       bool
+	calls    int
+}
+
+func (p *deadlineProbe) RoundTrip(r *http.Request) (*http.Response, error) {
+	p.calls++
+	p.deadline, p.ok = r.Context().Deadline()
+	body := answerJSON(testModel, "cand-a", "0.9")
+	return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
+}
+
+func TestJevDefaultDeadlineIsTwoSeconds(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	probe := &deadlineProbe{}
+	j := Jev{Client: &http.Client{Transport: probe}, URL: "http://127.0.0.1:1/v1/systemone", APIKey: testKey, Model: testModel}
+	before := time.Now()
+	if _, err := j.Choose(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	after := time.Now()
+	if probe.calls != 1 || !probe.ok {
+		t.Fatalf("calls=%d deadline set=%v", probe.calls, probe.ok)
+	}
+	if probe.deadline.Before(before.Add(2*time.Second)) || probe.deadline.After(after.Add(2*time.Second)) {
+		t.Fatalf("deadline %v not within [%v, %v]", probe.deadline, before.Add(2*time.Second), after.Add(2*time.Second))
+	}
+	if jevTimeout != 2*time.Second {
+		t.Fatalf("jevTimeout = %v", jevTimeout)
+	}
+}
+
+func TestJevGuardsSkipHTTP(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	j, hits := jevServer(t, reply(200, answerJSON(testModel, "cand-a", "0.9")))
+	for name, model := range map[string]string{"latest": "jev-latest", "preview": "jev-preview", "unversioned": "jev", "spaces": "jev 1.13.0", "partial": "jev-1.13", "suffix": "jev-1.13.0-rc1"} {
+		bad := j
+		bad.Model = model
+		_, err := bad.Choose(context.Background(), req)
+		if err == nil {
+			t.Fatalf("%s: accepted", name)
+		}
+		wantReason(t, err, ReasonInvalidRequest)
+	}
+	for _, n := range []int{0, 1} {
+		small := req
+		small.Candidates = req.Candidates[:n]
+		_, err := j.Choose(context.Background(), small)
+		wantReason(t, err, ReasonInvalidRequest)
+	}
+	if hits.Load() != 0 {
+		t.Fatalf("hits=%d", hits.Load())
 	}
 }
