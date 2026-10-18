@@ -30,7 +30,11 @@ func TestStarterAndInit(t *testing.T) {
 		t.Fatalf("expected existing-file error, got %v", err)
 	}
 	b, _ := os.ReadFile(path)
-	if string(b) != Starter {
+	expected := Starter
+	if os.Getenv("TYPESAFE_API_KEY") == "" {
+		expected = strings.Replace(expected, "\nbackend = \"jev\"", "\nbackend = \"heuristics\"", 1)
+	}
+	if string(b) != expected {
 		t.Fatal("existing file changed")
 	}
 	if err := Init(path, true); err != nil {
@@ -65,5 +69,20 @@ func TestValidation(t *testing.T) {
 				t.Fatalf("wanted %s, got %v", tc.want, err)
 			}
 		})
+	}
+}
+
+func TestInitWithoutKeyUsesOfflineClassifier(t *testing.T) {
+	t.Setenv("TYPESAFE_API_KEY", "")
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Init(path, false); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Classifier.Backend != "heuristics" {
+		t.Fatalf("backend = %s; want heuristics", c.Classifier.Backend)
 	}
 }

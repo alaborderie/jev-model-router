@@ -561,7 +561,7 @@ func TestSelectUsageThroughRun(t *testing.T) {
 
 func TestLegacyErrorsUnchanged(t *testing.T) {
 	isolate(t)
-	if err := run([]string{}); err == nil || err.Error() != "usage: mroute init|route|run|log|explain|eval" || exitCodeOf(err) != -1 {
+	if err := run([]string{}); err == nil || err.Error() != "usage: mroute init|route|run|log|explain|eval|doctor|serve" || exitCodeOf(err) != -1 {
 		t.Fatalf("empty args: %v", err)
 	}
 	if err := run([]string{"bogus"}); err == nil || exitCodeOf(err) != -1 {

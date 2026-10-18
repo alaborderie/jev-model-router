@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mroute": {
+      "command": "mroute",
+      "args": ["mcp"]
+    }
+  }
+}

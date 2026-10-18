@@ -1,0 +1,6 @@
+{
+  "name": "mroute",
+  "description": "Route one-shot coding tasks to a configured CLI, model, and effort",
+  "version": "0.1.0",
+  "author": { "name": "alaborderie" }
+}
