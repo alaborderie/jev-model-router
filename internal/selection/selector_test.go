@@ -188,3 +188,33 @@ func TestErrorTextIsReasonOnly(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestSelectMapsUntypedErrorAfterContextEnds(t *testing.T) {
+	req := decodeFixture(t, "unicode.json")
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	expired, cancel2 := context.WithTimeout(context.Background(), 0)
+	defer cancel2()
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+		err  error
+		want string
+	}{
+		{"cancel ctx.Err", cancelled, context.Canceled, ReasonCancelled},
+		{"cancel untyped", cancelled, errors.New("read: connection reset"), ReasonCancelled},
+		{"deadline ctx.Err", expired, context.DeadlineExceeded, ReasonTimeout},
+		{"deadline untyped", expired, errors.New("dial tcp: secret"), ReasonTimeout},
+		{"cancel typed wins", cancelled, &Error{Reason: ReasonRateLimit}, ReasonRateLimit},
+		{"deadline typed wins", expired, &Error{Reason: ReasonAuthentication}, ReasonAuthentication},
+		{"live ctx untyped", context.Background(), context.DeadlineExceeded, ReasonNetwork},
+	} {
+		f := &fakeClassifier{err: tc.err}
+		got := (Selector{Classifier: f}).Select(tc.ctx, req)
+		checkIdentity(t, req, got)
+		wantNulls(t, got)
+		if f.calls != 1 || got.Status != StatusError || got.Reason != tc.want {
+			t.Errorf("%s: %#v calls=%d", tc.name, got, f.calls)
+		}
+	}
+}

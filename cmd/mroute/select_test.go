@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alaborderie/f-0923-jev-model-router/internal/selection"
 )
@@ -33,11 +34,16 @@ type fakeClassifier struct {
 	resp  selection.Response
 	err   error
 	block bool
+	// entered, when non-nil, is closed once a blocking Choose has started.
+	entered chan struct{}
 }
 
 func (f *fakeClassifier) Choose(ctx context.Context, req selection.Request) (selection.Response, error) {
 	f.calls++
 	if f.block {
+		if f.entered != nil {
+			close(f.entered)
+		}
 		<-ctx.Done()
 		return selection.Response{}, ctx.Err()
 	}
@@ -334,7 +340,7 @@ func TestSelectNeverEchoesSecrets(t *testing.T) {
 func TestSelectCancellation(t *testing.T) {
 	b := fixture(t, "unicode.json")
 	ctx, cancel := context.WithCancel(context.Background())
-	f := &fakeClassifier{block: true}
+	f := &fakeClassifier{block: true, entered: make(chan struct{})}
 	done := make(chan struct{})
 	var stdout, stderr string
 	var code int
@@ -342,6 +348,7 @@ func TestSelectCancellation(t *testing.T) {
 		defer close(done)
 		stdout, stderr, code = runFake(ctx, b, f)
 	}()
+	<-f.entered // cancel during inference, after stdin was fully read
 	cancel()
 	<-done
 	got := decodeOne(t, stdout)
@@ -352,11 +359,48 @@ func TestSelectCancellation(t *testing.T) {
 
 func TestSelectDeadline(t *testing.T) {
 	b := fixture(t, "unicode.json")
-	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	// Long enough to finish reading stdin, so the deadline elapses during inference.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	stdout, stderr, code := runFake(ctx, b, &fakeClassifier{block: true})
 	if got := decodeOne(t, stdout); got.Reason != selection.ReasonTimeout || stderr != "mroute: select: timeout\n" || code != 1 {
 		t.Fatalf("got=%+v stderr=%q code=%d", got, stderr, code)
+	}
+}
+
+// runBlockedStdin runs the pipeline over a stdin that never delivers data or EOF.
+func runBlockedStdin(t *testing.T, ctx context.Context) (stdout, stderr string, code int) {
+	t.Helper()
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { pw.Close() })
+	var out, errOut bytes.Buffer
+	done := make(chan error, 1)
+	go func() { done <- report(&errOut, runSelect(ctx, pr, &out, &fakeClassifier{block: true})) }()
+	select {
+	case err := <-done:
+		return out.String(), errOut.String(), exitCodeOf(err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("runSelect ignored the context while reading stdin")
+		return "", "", 0
+	}
+}
+
+func TestSelectStdinDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	stdout, stderr, code := runBlockedStdin(t, ctx)
+	if stdout != "" || stderr != "mroute: select: timeout\n" || code != 1 {
+		t.Fatalf("stdout=%q stderr=%q code=%d", stdout, stderr, code)
+	}
+}
+
+func TestSelectStdinCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	defer cancel()
+	stdout, stderr, code := runBlockedStdin(t, ctx)
+	if stdout != "" || stderr != "mroute: select: cancelled\n" || code != 1 {
+		t.Fatalf("stdout=%q stderr=%q code=%d", stdout, stderr, code)
 	}
 }
 

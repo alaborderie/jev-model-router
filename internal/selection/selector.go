@@ -43,12 +43,7 @@ func (s Selector) Select(ctx context.Context, req Request) Response {
 	got, err := s.Classifier.Choose(ctx, req)
 	resp.LatencyMS = time.Since(start).Milliseconds()
 	if err != nil {
-		reason := ReasonNetwork
-		var e *Error
-		if errors.As(err, &e) && reasonRules[e.Reason].status == StatusError {
-			reason = e.Reason
-		}
-		return failed(resp, reason)
+		return failed(resp, errorReason(ctx, err))
 	}
 	if got.CandidateID == nil || !slices.ContainsFunc(req.Candidates, func(c Candidate) bool { return c.CandidateID == *got.CandidateID }) {
 		return failed(resp, ReasonInvalidResponse)
@@ -63,6 +58,21 @@ func (s Selector) Select(ctx context.Context, req Request) Response {
 		return failed(resp, ReasonInvalidResponse)
 	}
 	return resp
+}
+
+// errorReason maps a classifier failure to a closed reason. A typed error-status reason wins;
+// an untyped failure after the context ended is cancellation or timeout, otherwise network.
+func errorReason(ctx context.Context, err error) string {
+	var e *Error
+	switch {
+	case errors.As(err, &e) && reasonRules[e.Reason].status == StatusError:
+		return e.Reason
+	case errors.Is(ctx.Err(), context.Canceled):
+		return ReasonCancelled
+	case ctx.Err() != nil:
+		return ReasonTimeout
+	}
+	return ReasonNetwork
 }
 
 func failed(resp Response, reason string) Response {

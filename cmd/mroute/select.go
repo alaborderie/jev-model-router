@@ -71,16 +71,31 @@ func parseSelectArgs(args []string) (pin string, ok bool) {
 }
 
 // runSelect decodes one request, selects and writes exactly one JSON line for any valid request.
-func runSelect(ctx context.Context, in io.Reader, out io.Writer, classifier selection.Classifier) error {
-	req, err := selection.Decode(in)
-	if err != nil {
+// The stdin read is bounded by ctx: if the deadline or a signal arrives first, nothing is written
+// to stdout and the abandoned reader goroutine ends with the process.
+func runSelect(ctx context.Context, in io.Reader, out io.Writer, classifier selection.Classifier) *selectError {
+	type decoded struct {
+		req selection.Request
+		err error
+	}
+	ch := make(chan decoded, 1)
+	go func() {
+		req, err := selection.Decode(in)
+		ch <- decoded{req, err}
+	}()
+	var d decoded
+	select {
+	case d = <-ch:
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return &selectError{selection.ReasonCancelled}
+		}
+		return &selectError{selection.ReasonTimeout}
+	}
+	if d.err != nil {
 		return &selectError{selection.ReasonInvalidRequest}
 	}
-	s := selection.Selector{}
-	if classifier != nil {
-		s.Classifier = contextClassifier{classifier}
-	}
-	resp := s.Select(ctx, req)
+	resp := selection.Selector{Classifier: classifier}.Select(ctx, d.req)
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(resp); err != nil {
@@ -93,12 +108,10 @@ func runSelect(ctx context.Context, in io.Reader, out io.Writer, classifier sele
 }
 
 // report writes the single stderr line for a select failure and converts it to an exit status.
-func report(errOut io.Writer, err error) error {
-	if err == nil {
+func report(errOut io.Writer, se *selectError) error {
+	if se == nil {
 		return nil
 	}
-	se := &selectError{"output"}
-	errors.As(err, &se)
 	fmt.Fprintf(errOut, "mroute: select: %s\n", se.reason)
 	return exitStatus(se.exitCode())
 }
@@ -108,22 +121,4 @@ type pinnedJev struct{ model string }
 
 func (p pinnedJev) Choose(ctx context.Context, req selection.Request) (selection.Response, error) {
 	return selection.Jev{APIKey: os.Getenv("TYPESAFE_API_KEY"), Model: p.model}.Choose(ctx, req)
-}
-
-// contextClassifier maps untyped failures after cancellation or deadline to closed reasons.
-type contextClassifier struct{ selection.Classifier }
-
-func (c contextClassifier) Choose(ctx context.Context, req selection.Request) (selection.Response, error) {
-	resp, err := c.Classifier.Choose(ctx, req)
-	var typed *selection.Error
-	if err == nil || errors.As(err, &typed) {
-		return resp, err
-	}
-	switch {
-	case errors.Is(ctx.Err(), context.Canceled):
-		return resp, &selection.Error{Reason: selection.ReasonCancelled}
-	case ctx.Err() != nil:
-		return resp, &selection.Error{Reason: selection.ReasonTimeout}
-	}
-	return resp, err
 }

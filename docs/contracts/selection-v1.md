@@ -23,7 +23,9 @@ mroute select --json [--jev-model <versioned-id>] < request.json > response.json
   or more candidates; empty and singleton requests complete without a model or key.
 - The endpoint is the TypeSafe production endpoint; neither the request nor the
   command line can override it. The API key is read from `TYPESAFE_API_KEY` by name
-  only when inference is needed.
+  only when inference is needed. The HTTP client honours the standard proxy
+  environment variables (`HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`), as the legacy
+  classifier does; the endpoint itself is fixed.
 - Deadlines: the whole command 3 seconds, the single Jev HTTP request 2 seconds. One
   HTTP request at most; no retry. SIGINT/SIGTERM cancel the request.
 
@@ -169,6 +171,8 @@ legacy `routing.safe_target` is never consulted on this path.
 | 1 | `error` other than `invalid_request` | response | one line `mroute: select: <reason>` |
 | 2 | `error` with `invalid_request` | response | one line `mroute: select: invalid_request` |
 | 2 | malformed, oversized or invalid input; bad arguments | empty | one line `mroute: select: invalid_request` or `mroute: select: usage` |
+| 1 | the 3 s deadline or SIGINT/SIGTERM arrives before the request is fully read | empty | one line `mroute: select: timeout` or `mroute: select: cancelled` |
+| 1 | writing stdout fails | possibly partial or empty | one line `mroute: select: output` (a broken pipe may instead terminate the process with SIGPIPE) |
 
 stderr never contains request content, provider response bodies, URLs or credentials.
 

@@ -30,7 +30,7 @@ The CLI runs only one task at a time. Plugin recommendations in later milestones
 mroute select --json [--jev-model jev-1.13.0] < request.json > response.json
 ```
 
-`mroute select` answers one selection request over caller-authorized candidates and writes exactly one JSON response line. It never reads `config.toml`, never writes the route log, never prints argv and never launches an engine; fallback and quota decisions stay with the caller. Empty and single-candidate requests need no model or key. Two or more candidates require a versioned `--jev-model` pin and `TYPESAFE_API_KEY`. Exit status is 0 for a selection or abstention, 1 for a selection error, and 2 for invalid input or arguments. The normative wire contract, limits and exit codes are in [`docs/contracts/selection-v1.md`](docs/contracts/selection-v1.md).
+`mroute select` answers one selection request over caller-authorized candidates and writes exactly one JSON response line. It never reads `config.toml`, never writes the route log, never prints argv and never launches an engine; fallback and quota decisions stay with the caller. Empty and single-candidate requests need no model or key. Two or more candidates require a versioned `--jev-model` pin and `TYPESAFE_API_KEY`. Exit status is 0 for a selection or abstention, 1 for a selection error, and 2 for `invalid_request` (including two or more candidates without `--jev-model`) or bad arguments. The normative wire contract, limits and exit codes are in [`docs/contracts/selection-v1.md`](docs/contracts/selection-v1.md).
 
 ## M1 routing evaluation
 
