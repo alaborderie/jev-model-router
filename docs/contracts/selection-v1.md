@@ -16,9 +16,10 @@ mroute select --json [--jev-model <versioned-id>] < request.json > response.json
 
 - `--json` is required; it is the only output format.
 - `--jev-model` is the trusted model pin from consumer policy. It must be a versioned
-  Jev ID matching `^jev-[0-9]+\.[0-9]+\.[0-9]+$` (for example `jev-1.13.0`); the
-  moving aliases `jev-latest` and `jev-preview` are rejected because confidence
-  thresholds are calibrated per version. It is required only when the request has two
+  Jev ID matching `^jev-[0-9]+\.[0-9]+\.[0-9]+$` (for example `jev-1.13.0`;
+  `selection.ValidJevModel`); the moving aliases `jev-latest` and `jev-preview` are
+  rejected because the confidence gate is only meaningful against a pinned model
+  version. It is required only when the request has two
   or more candidates; empty and singleton requests complete without a model or key.
 - The endpoint is the TypeSafe production endpoint; neither the request nor the
   command line can override it. The API key is read from `TYPESAFE_API_KEY` by name
@@ -113,12 +114,13 @@ newline, with these keys in this order:
 | Field | Rule |
 | --- | --- |
 | `schema_version` | `1` |
-| `request_id`, `candidate_set_hash` | copied from the validated request |
+| `request_id` | Id; copied from the validated request |
+| `candidate_set_hash` | 64 lowercase hex; copied from the validated request |
 | `status` | `selected`, `abstained` or `error` |
 | `candidate_id` | an in-request ID when `selected`; otherwise `null` |
 | `reason` | closed code, see below |
 | `confidence` | `null` or finite number in [0, 1] |
-| `selector_model` | `null` or the Id of the Jev version that answered |
+| `selector_model` | `null` or the versioned Jev ID that answered, matching `^jev-[0-9]+\.[0-9]+\.[0-9]+$` |
 | `latency_ms` | nonnegative integer, time spent selecting |
 | `usage` | `null` or `{"input_tokens":n,"output_tokens":n}`, n nonnegative integers |
 
@@ -139,13 +141,22 @@ Reasons, by status:
 | `error` | `timeout` | the 2 s HTTP or 3 s command deadline elapsed |
 | `error` | `cancelled` | the command received SIGINT/SIGTERM |
 
+**Confidence gate.** The gate is `0.60`, a protocol-v1 constant applied against the
+pinned model version (`--jev-model`). It is not a request field, flag or consumer
+setting; changing it requires a new protocol version. `classified` requires
+confidence ≥ 0.60 and `low_confidence` requires confidence < 0.60; a response that
+contradicts the gate is invalid.
+
 `classified` and `low_confidence` occur only with two or more candidates, `singleton`
 only with one, `no_candidates` only with zero; `error`/`invalid_request` only with two
 or more. On `error`, `candidate_id` and `confidence` are `null`; `selector_model` and
 `usage` are `null` unless Jev returned them in a typed answer that failed validation,
-so they may be non-null only with reason `invalid_response`. The caller must check `request_id`
-and `candidate_set_hash` against its own request and refuse a response for another
-request even if its `candidate_id` is valid (`selection.ValidateResponse`).
+so they may be non-null only with reason `invalid_response` and only when the request
+has two or more candidates (no inference happens otherwise). The caller must check
+that `request_id` is an Id and `candidate_set_hash` is 64 lowercase hex, that both
+equal its own request's values, and refuse a response for another request even if its
+`candidate_id` is valid (`selection.ValidateResponse`, which also enforces the gate
+and the `selector_model` grammar).
 
 A selection error never falls back to another candidate inside mroute; mroute's
 legacy `routing.safe_target` is never consulted on this path.
@@ -169,3 +180,32 @@ version and `role_brief`. TypeSafe `state` is
 `{"role_policy_version": …, "venture_state": <state>}`. No effort score is asked.
 The returned `model` must equal the pin; `choice` must be an in-request ID;
 `confidence` must be finite in [0, 1].
+
+## Fixtures
+
+`testdata/selection-v1/` holds request fixtures (`*.json`, `invalid/*.json`),
+response fixtures (`responses/*.json`, `responses/invalid/*.json`), the reference
+hasher `reference_hash.py`, and `manifest.json`. Every fixture file appears in the
+manifest exactly once. The manifest is a JSON array of entries with exactly these
+keys:
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `file` | string | path relative to `testdata/selection-v1/`, `/`-separated |
+| `kind` | `"request"` or `"response"` | |
+| `valid` | boolean | whether the fixture must be accepted |
+| `request` | string or `null` | for responses, the request fixture it answers; `null` for requests |
+| `candidate_set_hash` | string or `null` | the expected hash for valid requests; otherwise `null` |
+| `error` | string or `null` | `null` when `valid`; otherwise the expected error code |
+
+`error` is the bare code after the sentinel prefix: mroute's `Decode` returns
+`invalid_request: <code>` for requests and `ValidateResponse` returns
+`invalid_response: <code>` for responses, so `kind` determines the prefix and the
+manifest omits it (for example `"error": "duplicate_key"`). These codes are
+informative only, for mroute's own tests; they are not part of the CLI interface. The
+CLI prints only `mroute: select: invalid_request` for any rejected request, and other
+implementations need only agree on `valid`, not on the code.
+
+Regenerate with `MROUTE_WRITE_SELECTION_FIXTURES=1 go test ./internal/selection -run
+TestWriteFixtures`; the valid request hashes must not change without a protocol
+version bump.

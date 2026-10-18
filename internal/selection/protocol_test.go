@@ -10,12 +10,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 )
 
 const fixtureDir = "../../testdata/selection-v1"
+
+// requirePythonEnv turns a missing python3 into a failure instead of a skip.
+const requirePythonEnv = "MROUTE_REQUIRE_PYTHON"
 
 type manifestEntry struct {
 	File             string  `json:"file"`
@@ -23,22 +26,7 @@ type manifestEntry struct {
 	Valid            bool    `json:"valid"`
 	Request          *string `json:"request"`
 	CandidateSetHash *string `json:"candidate_set_hash"`
-}
-
-var invalidFixtureCodes = map[string]string{
-	"invalid/trailing-value.json":             "trailing_data",
-	"invalid/duplicate-key-top.json":          "duplicate_key",
-	"invalid/duplicate-key-nested-state.json": "duplicate_key",
-	"invalid/duplicate-candidate-id.json":     "duplicate_candidate_id",
-	"invalid/hash-mismatch.json":              "hash_mismatch",
-	"invalid/unknown-field.json":              "unknown_field",
-	"invalid/float-in-state.json":             "state_number",
-	"invalid/oversize.json":                   "too_large",
-	"invalid/lone-surrogate.json":             "surrogate",
-	"invalid/bad-id-char.json":                "role_policy_version",
-	"invalid/revision-zero.json":              "configuration_revision",
-	"invalid/schema-version-2.json":           "schema_version",
-	"invalid/too-many-candidates.json":        "too_many_candidates",
+	Error            *string `json:"error"`
 }
 
 func readFixture(t *testing.T, name string) []byte {
@@ -71,6 +59,12 @@ func wantCode(t *testing.T, err error, code string) {
 		t.Fatalf("want invalid_request: %s, got %v", code, err)
 	}
 }
+func wantResponseCode(t *testing.T, err error, code string) {
+	t.Helper()
+	if !errors.Is(err, ErrInvalidResponse) || err.Error() != "invalid_response: "+code {
+		t.Fatalf("want invalid_response: %s, got %v", code, err)
+	}
+}
 
 func testCandidate(i int) map[string]any {
 	return map[string]any{"candidate_id": "cand-" + string(rune('a'+i/26)) + string(rune('a'+i%26)), "access_id": "access-1", "engine": "opencode", "provider_id": "test", "model_id": "model-a", "transport": "cli", "variant": "high", "capability_profile_version": "caps-v1", "configuration_revision": json.Number("1"), "description": "Synthetic candidate; quota unknown"}
@@ -90,11 +84,8 @@ func rawHash(t *testing.T, cands []any) string {
 		s, _ := m["candidate_id"].(string)
 		return s
 	}
-	sort.SliceStable(s, func(i, j int) bool {
-		a, b := id(s[i]), id(s[j])
-		return a < b
-	})
-	b, err := Canonical(s)
+	slices.SortStableFunc(s, func(a, b any) int { return strings.Compare(id(a), id(b)) })
+	b, err := canonical(s)
 	if err != nil {
 		return strings.Repeat("0", 64)
 	}
@@ -133,22 +124,41 @@ func nested(levels int, leaf any, array bool) any {
 
 func TestManifestFixtures(t *testing.T) {
 	entries := readManifest(t)
+	var raw []map[string]json.RawMessage
+	if err := json.Unmarshal(readFixture(t, "manifest.json"), &raw); err != nil || len(raw) != len(entries) {
+		t.Fatalf("manifest not a flat entry list: %v", err)
+	}
+	for i, r := range raw {
+		if len(r) != 6 {
+			t.Errorf("%s: entry must carry exactly file, kind, valid, request, candidate_set_hash, error", entries[i].File)
+		}
+		if _, ok := r["error"]; !ok {
+			t.Errorf("%s: entry lacks the error key", entries[i].File)
+		}
+	}
 	seen := map[string]bool{}
+	invalidRequests, invalidResponses := 0, 0
 	for _, e := range entries {
+		if seen[e.File] {
+			t.Errorf("duplicate manifest entry %s", e.File)
+		}
 		seen[e.File] = true
 		t.Run(e.File, func(t *testing.T) {
+			if e.Valid != (e.Error == nil) {
+				t.Fatalf("valid=%v but error=%v", e.Valid, e.Error)
+			}
+			if e.Error != nil && (*e.Error == "" || strings.Contains(*e.Error, ":")) {
+				t.Fatalf("error must be the bare code, got %q", *e.Error)
+			}
 			switch e.Kind {
 			case "request":
 				req, err := Decode(bytes.NewReader(readFixture(t, e.File)))
 				if !e.Valid {
+					invalidRequests++
 					if e.CandidateSetHash != nil || e.Request != nil {
 						t.Fatal("invalid request entry carries hash or request")
 					}
-					code, ok := invalidFixtureCodes[e.File]
-					if !ok {
-						t.Fatal("no expected code for invalid fixture")
-					}
-					wantCode(t, err, code)
+					wantCode(t, err, *e.Error)
 					return
 				}
 				if err != nil {
@@ -170,37 +180,52 @@ func TestManifestFixtures(t *testing.T) {
 					t.Fatal(err)
 				}
 				err := ValidateResponse(req, resp)
-				if e.Valid && err != nil {
-					t.Fatalf("valid response rejected: %v", err)
+				if e.Valid {
+					if err != nil {
+						t.Fatalf("valid response rejected: %v", err)
+					}
+					return
 				}
-				if !e.Valid && !errors.Is(err, ErrInvalidResponse) {
-					t.Fatalf("invalid response accepted: %v", err)
-				}
+				invalidResponses++
+				wantResponseCode(t, err, *e.Error)
 			default:
 				t.Fatalf("unknown kind %q", e.Kind)
 			}
 		})
 	}
-	for name := range invalidFixtureCodes {
-		if !seen[name] {
-			t.Errorf("manifest misses %s", name)
-		}
+	if invalidRequests == 0 || invalidResponses == 0 {
+		t.Errorf("manifest lacks invalid fixtures: %d requests, %d responses", invalidRequests, invalidResponses)
 	}
 	for _, name := range []string{"empty.json", "singleton.json", "unicode.json"} {
 		if !seen[name] {
 			t.Errorf("manifest misses %s", name)
 		}
 	}
-	files, err := filepath.Glob(filepath.Join(fixtureDir, "*", "*.json"))
-	if err != nil {
-		t.Fatal(err)
+	var onDisk []string
+	for _, pattern := range []string{"*.json", "*/*.json", "*/*/*.json"} {
+		files, err := filepath.Glob(filepath.Join(fixtureDir, filepath.FromSlash(pattern)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		onDisk = append(onDisk, files...)
 	}
-	top, _ := filepath.Glob(filepath.Join(fixtureDir, "*.json"))
-	for _, f := range append(files, top...) {
+	for _, f := range onDisk {
 		rel, _ := filepath.Rel(fixtureDir, f)
-		if rel != "manifest.json" && !seen[filepath.ToSlash(rel)] {
+		rel = filepath.ToSlash(rel)
+		if rel != "manifest.json" && !seen[rel] {
 			t.Errorf("fixture %s not in manifest", rel)
 		}
+		delete(seen, rel)
+	}
+	for name := range seen {
+		t.Errorf("manifest names missing file %s", name)
+	}
+}
+
+func TestEscapedDuplicateKeyFixture(t *testing.T) {
+	b := readFixture(t, "invalid/duplicate-key-escaped.json")
+	if !bytes.Contains(b, []byte(`"`+"\\"+`u0072ole"`)) {
+		t.Fatal("fixture does not contain an escaped key on disk")
 	}
 }
 
@@ -219,7 +244,7 @@ func TestDecodeValidFixtures(t *testing.T) {
 		if err := d.Decode(&g); err != nil {
 			t.Fatal(err)
 		}
-		c, err := Canonical(g)
+		c, err := canonical(g)
 		if err != nil || !bytes.Equal(c, raw) {
 			t.Fatalf("role_brief/state not canonical: %s", raw)
 		}
@@ -273,11 +298,18 @@ func TestDecodeRejectsDuplicateKeys(t *testing.T) {
 		"candidate": {`"access_id":"access-1"`, `"access_id":"access-1","access_id":"access-2"`},
 		"state":     {`"state":{"role":"developer"}`, `"state":{"role":"developer","x":{"y":[{"k":"a","k":"b"}]}}`},
 		"brief":     {`"role_brief":{"objective":"test"}`, `"role_brief":{"objective":"test","objective":"other"}`},
-		"escaped":   {`"state":{"role":"developer"}`, `"state":{"role":"developer","role":"x"}`},
+		"escaped":   {`"state":{"role":"developer"}`, `"state":{"role":"developer","\u0072ole":"x"}`},
+		"non-bmp":   {`"state":{"role":"developer"}`, `"state":{"role":"developer","🚀":"a","\ud83d\ude80":"b"}`},
+		"non-bmp-2": {`"state":{"role":"developer"}`, `"state":{"role":"developer","\uD83D\uDE80":"a","🚀":"b"}`},
 	} {
 		in := bytes.Replace(base, []byte(edit[0]), []byte(edit[1]), 1)
 		if bytes.Equal(in, base) {
 			t.Fatalf("%s: edit did not apply", name)
+		}
+		if strings.HasPrefix(name, "escaped") || strings.HasPrefix(name, "non-bmp") {
+			if !strings.Contains(edit[1], `\u`) {
+				t.Fatalf("%s: case lost its escape", name)
+			}
 		}
 		_, err := Decode(bytes.NewReader(in))
 		wantCode(t, err, "duplicate_key")
@@ -552,7 +584,7 @@ func TestDecodeErrorsNeverEchoInput(t *testing.T) {
 
 func TestCanonicalGolden(t *testing.T) {
 	s := "a\u2028b\u2029c\u0001d\u007fe<&>f\"g\\h\\u2028i\nj\tk\bl\fm\rn\u001fo🚀pé中\u0000"
-	got, err := Canonical(map[string]any{"s": s, "b": true, "n": nil, "i": json.Number("42"), "f": false, "a": []any{}, "o": map[string]any{}, "é": "x", "Z": "y", "中": "z", "z": "w"})
+	got, err := canonical(map[string]any{"s": s, "b": true, "n": nil, "i": json.Number("42"), "f": false, "a": []any{}, "o": map[string]any{}, "é": "x", "Z": "y", "中": "z", "z": "w"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -560,12 +592,12 @@ func TestCanonicalGolden(t *testing.T) {
 	if string(got) != want {
 		t.Fatalf("canonical mismatch\n got %q\nwant %q", got, want)
 	}
-	for _, bad := range []any{1.5, float64(1), json.Number("1.5"), json.Number("-0"), json.Number("1e3"), json.Number("01"), "\xff", map[string]any{"\xff": "x"}, []string{"x"}, struct{}{}} {
-		if _, err := Canonical(bad); err == nil {
+	for _, bad := range []any{1.5, float64(1), json.Number("1.5"), json.Number("-0"), json.Number("1e3"), json.Number("01"), json.Number("-12"), 1, "\xff", map[string]any{"\xff": "x"}, []string{"x"}, struct{}{}} {
+		if _, err := canonical(bad); err == nil {
 			t.Fatalf("canonical accepted %#v", bad)
 		}
 	}
-	if b, err := Canonical(json.Number("-12")); err != nil || string(b) != "-12" {
+	if b, err := canonical(int64(-12)); err != nil || string(b) != "-12" {
 		t.Fatalf("negative integer: %s %v", b, err)
 	}
 }
@@ -610,7 +642,10 @@ func TestCandidateHashNullVariantAndOrder(t *testing.T) {
 func TestPythonReferenceHash(t *testing.T) {
 	py, err := exec.LookPath("python3")
 	if err != nil {
-		t.Skip("python3 not on PATH")
+		if os.Getenv(requirePythonEnv) == "1" {
+			t.Fatal("python3 not on PATH but " + requirePythonEnv + "=1")
+		}
+		t.Skip("python3 not on PATH; set " + requirePythonEnv + "=1 to require it")
 	}
 	var files []string
 	want := map[string]string{}
@@ -641,9 +676,11 @@ func TestPythonReferenceHash(t *testing.T) {
 			t.Fatalf("python/go disagree: %q vs %s", line, want[files[i]])
 		}
 	}
-	bad := filepath.Join(fixtureDir, "invalid", "duplicate-key-top.json")
-	if err := exec.Command(py, "-I", filepath.Join(fixtureDir, "reference_hash.py"), bad).Run(); err == nil {
-		t.Fatal("python reference accepted a duplicate key")
+	for _, name := range []string{"duplicate-key-top.json", "duplicate-key-escaped.json"} {
+		bad := filepath.Join(fixtureDir, "invalid", name)
+		if err := exec.Command(py, "-I", filepath.Join(fixtureDir, "reference_hash.py"), bad).Run(); err == nil {
+			t.Fatalf("python reference accepted duplicate key in %s", name)
+		}
 	}
 }
 
@@ -685,6 +722,12 @@ func TestValidateResponseInvariants(t *testing.T) {
 		{3, resp(3, StatusError, ReasonInvalidRequest, nil, nil, nil, nil)},
 		{3, resp(3, StatusError, ReasonInvalidResponse, nil, nil, model, u)},
 		{3, resp(3, StatusError, ReasonInvalidResponse, nil, nil, nil, nil)},
+		{3, resp(3, StatusSelected, ReasonClassified, in3, ptr(ConfidenceGate), model, u)},
+		{3, resp(3, StatusAbstained, ReasonLowConfidence, nil, ptr(0.5999), model, u)},
+		{3, resp(3, StatusSelected, ReasonClassified, in3, ptr(0.9), ptr("jev-0.0.0"), u)},
+		{3, resp(3, StatusSelected, ReasonClassified, in3, ptr(0.9), ptr("jev-10.200.3000"), u)},
+		{1, resp(1, StatusError, ReasonInvalidResponse, nil, nil, nil, nil)},
+		{0, resp(0, StatusError, ReasonInvalidResponse, nil, nil, nil, nil)},
 	}
 	for _, reason := range []string{ReasonAuthentication, ReasonRateLimit, ReasonOverloaded, ReasonNetwork, ReasonTimeout, ReasonCancelled} {
 		valid = append(valid, struct {
@@ -703,44 +746,88 @@ func TestValidateResponseInvariants(t *testing.T) {
 		name string
 		n    int
 		r    Response
+		code string
 	}{
-		{"stale request_id", 3, mod(good, func(r *Response) { r.RequestID = "req-other" })},
-		{"stale hash", 3, mod(good, func(r *Response) { r.CandidateSetHash = reqs[1].CandidateSetHash })},
-		{"schema", 3, mod(good, func(r *Response) { r.SchemaVersion = 2 })},
-		{"out of set", 3, mod(good, func(r *Response) { r.CandidateID = in1 })},
-		{"selected null id", 3, mod(good, func(r *Response) { r.CandidateID = nil })},
-		{"unknown status", 3, mod(good, func(r *Response) { r.Status = "chosen" })},
-		{"unknown reason", 3, mod(good, func(r *Response) { r.Reason = "guess" })},
-		{"status/reason mismatch", 3, mod(good, func(r *Response) { r.Status = StatusAbstained; r.CandidateID = nil })},
-		{"confidence 1.5", 3, mod(good, func(r *Response) { r.Confidence = ptr(1.5) })},
-		{"confidence -0.1", 3, mod(good, func(r *Response) { r.Confidence = ptr(-0.1) })},
-		{"confidence NaN", 3, mod(good, func(r *Response) { r.Confidence = ptr(math.NaN()) })},
-		{"confidence Inf", 3, mod(good, func(r *Response) { r.Confidence = ptr(math.Inf(1)) })},
-		{"classified null confidence", 3, mod(good, func(r *Response) { r.Confidence = nil })},
-		{"classified null model", 3, mod(good, func(r *Response) { r.SelectorModel = nil })},
-		{"bad model id", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("jev 1") })},
-		{"negative latency", 3, mod(good, func(r *Response) { r.LatencyMS = -1 })},
-		{"negative usage", 3, mod(good, func(r *Response) { r.Usage = &Usage{InputTokens: -1} })},
-		{"classified on singleton", 1, resp(1, StatusSelected, ReasonClassified, in1, ptr(0.9), model, nil)},
-		{"singleton on 3", 3, resp(3, StatusSelected, ReasonSingleton, in3, nil, nil, nil)},
-		{"singleton with confidence", 1, resp(1, StatusSelected, ReasonSingleton, in1, ptr(1.0), nil, nil)},
-		{"singleton with model", 1, resp(1, StatusSelected, ReasonSingleton, in1, nil, model, nil)},
-		{"singleton with usage", 1, resp(1, StatusSelected, ReasonSingleton, in1, nil, nil, u)},
-		{"no_candidates on 3", 3, resp(3, StatusAbstained, ReasonNoCandidates, nil, nil, nil, nil)},
-		{"abstained with id", 0, resp(0, StatusAbstained, ReasonNoCandidates, ptr("cand-a"), nil, nil, nil)},
-		{"low_confidence with id", 3, resp(3, StatusAbstained, ReasonLowConfidence, in3, ptr(0.2), model, nil)},
-		{"low_confidence null confidence", 3, resp(3, StatusAbstained, ReasonLowConfidence, nil, nil, model, nil)},
-		{"low_confidence on singleton", 1, resp(1, StatusAbstained, ReasonLowConfidence, nil, ptr(0.2), model, nil)},
-		{"error with id", 3, resp(3, StatusError, ReasonTimeout, in3, nil, nil, nil)},
-		{"error with confidence", 3, resp(3, StatusError, ReasonInvalidResponse, nil, ptr(0.5), model, nil)},
-		{"timeout with model", 3, resp(3, StatusError, ReasonTimeout, nil, nil, model, nil)},
-		{"network with usage", 3, resp(3, StatusError, ReasonNetwork, nil, nil, nil, u)},
-		{"invalid_request on singleton", 1, resp(1, StatusError, ReasonInvalidRequest, nil, nil, nil, nil)},
-		{"reason under wrong status", 3, resp(3, StatusSelected, ReasonTimeout, in3, nil, nil, nil)},
+		{"stale request_id", 3, mod(good, func(r *Response) { r.RequestID = "req-other" }), "request_id"},
+		{"stale hash", 3, mod(good, func(r *Response) { r.CandidateSetHash = reqs[1].CandidateSetHash }), "candidate_set_hash"},
+		{"schema", 3, mod(good, func(r *Response) { r.SchemaVersion = 2 }), "schema_version"},
+		{"out of set", 3, mod(good, func(r *Response) { r.CandidateID = in1 }), "candidate_id"},
+		{"selected null id", 3, mod(good, func(r *Response) { r.CandidateID = nil }), "candidate_id"},
+		{"unknown status", 3, mod(good, func(r *Response) { r.Status = "chosen" }), "status"},
+		{"unknown reason", 3, mod(good, func(r *Response) { r.Reason = "guess" }), "reason"},
+		{"status/reason mismatch", 3, mod(good, func(r *Response) { r.Status = StatusAbstained; r.CandidateID = nil }), "status"},
+		{"confidence 1.5", 3, mod(good, func(r *Response) { r.Confidence = ptr(1.5) }), "confidence"},
+		{"confidence -0.1", 3, mod(good, func(r *Response) { r.Confidence = ptr(-0.1) }), "confidence"},
+		{"confidence NaN", 3, mod(good, func(r *Response) { r.Confidence = ptr(math.NaN()) }), "confidence"},
+		{"confidence Inf", 3, mod(good, func(r *Response) { r.Confidence = ptr(math.Inf(1)) }), "confidence"},
+		{"classified null confidence", 3, mod(good, func(r *Response) { r.Confidence = nil }), "missing_inference"},
+		{"classified null model", 3, mod(good, func(r *Response) { r.SelectorModel = nil }), "missing_inference"},
+		{"bad model id", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("jev 1") }), "selector_model"},
+		{"negative latency", 3, mod(good, func(r *Response) { r.LatencyMS = -1 }), "latency_ms"},
+		{"negative usage", 3, mod(good, func(r *Response) { r.Usage = &Usage{InputTokens: -1} }), "usage"},
+		{"classified on singleton", 1, resp(1, StatusSelected, ReasonClassified, in1, ptr(0.9), model, nil), "reason_for_candidate_count"},
+		{"singleton on 3", 3, resp(3, StatusSelected, ReasonSingleton, in3, nil, nil, nil), "reason_for_candidate_count"},
+		{"singleton with confidence", 1, resp(1, StatusSelected, ReasonSingleton, in1, ptr(1.0), nil, nil), "confidence"},
+		{"singleton with model", 1, resp(1, StatusSelected, ReasonSingleton, in1, nil, model, nil), "unexpected_inference"},
+		{"singleton with usage", 1, resp(1, StatusSelected, ReasonSingleton, in1, nil, nil, u), "unexpected_inference"},
+		{"no_candidates on 3", 3, resp(3, StatusAbstained, ReasonNoCandidates, nil, nil, nil, nil), "reason_for_candidate_count"},
+		{"abstained with id", 0, resp(0, StatusAbstained, ReasonNoCandidates, ptr("cand-a"), nil, nil, nil), "candidate_id"},
+		{"low_confidence with id", 3, resp(3, StatusAbstained, ReasonLowConfidence, in3, ptr(0.2), model, nil), "candidate_id"},
+		{"low_confidence null confidence", 3, resp(3, StatusAbstained, ReasonLowConfidence, nil, nil, model, nil), "missing_inference"},
+		{"low_confidence on singleton", 1, resp(1, StatusAbstained, ReasonLowConfidence, nil, ptr(0.2), model, nil), "reason_for_candidate_count"},
+		{"error with id", 3, resp(3, StatusError, ReasonTimeout, in3, nil, nil, nil), "candidate_id"},
+		{"error with confidence", 3, resp(3, StatusError, ReasonInvalidResponse, nil, ptr(0.5), model, nil), "confidence"},
+		{"timeout with model", 3, resp(3, StatusError, ReasonTimeout, nil, nil, model, nil), "unexpected_inference"},
+		{"network with usage", 3, resp(3, StatusError, ReasonNetwork, nil, nil, nil, u), "unexpected_inference"},
+		{"invalid_request on singleton", 1, resp(1, StatusError, ReasonInvalidRequest, nil, nil, nil, nil), "reason_for_candidate_count"},
+		{"reason under wrong status", 3, resp(3, StatusSelected, ReasonTimeout, in3, nil, nil, nil), "status"},
+		{"classified below gate", 3, mod(good, func(r *Response) { r.Confidence = ptr(0.5999) }), "confidence_gate"},
+		{"classified at zero", 3, mod(good, func(r *Response) { r.Confidence = ptr(0.0) }), "confidence_gate"},
+		{"low_confidence at gate", 3, resp(3, StatusAbstained, ReasonLowConfidence, nil, ptr(ConfidenceGate), model, u), "confidence_gate"},
+		{"low_confidence at one", 3, resp(3, StatusAbstained, ReasonLowConfidence, nil, ptr(1.0), model, u), "confidence_gate"},
+		{"empty request_id", 3, mod(good, func(r *Response) { r.RequestID = "" }), "request_id"},
+		{"empty hash", 3, mod(good, func(r *Response) { r.CandidateSetHash = "" }), "candidate_set_hash"},
+		{"model alias latest", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("jev-latest") }), "selector_model"},
+		{"model alias preview", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("jev-preview") }), "selector_model"},
+		{"model two parts", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("jev-1.13") }), "selector_model"},
+		{"model suffix", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("jev-1.13.0-rc1") }), "selector_model"},
+		{"model other family", 3, mod(good, func(r *Response) { r.SelectorModel = ptr("gpt-1.13.0") }), "selector_model"},
+		{"low_confidence alias model", 3, resp(3, StatusAbstained, ReasonLowConfidence, nil, ptr(0.2), ptr("jev-latest"), u), "selector_model"},
+		{"invalid_response alias model", 3, resp(3, StatusError, ReasonInvalidResponse, nil, nil, ptr("jev-latest"), u), "selector_model"},
+		{"invalid_response model on singleton", 1, resp(1, StatusError, ReasonInvalidResponse, nil, nil, model, nil), "unexpected_inference"},
+		{"invalid_response usage on singleton", 1, resp(1, StatusError, ReasonInvalidResponse, nil, nil, nil, u), "unexpected_inference"},
+		{"invalid_response model on empty", 0, resp(0, StatusError, ReasonInvalidResponse, nil, nil, model, u), "unexpected_inference"},
 	}
 	for _, tc := range invalid {
-		if err := ValidateResponse(reqs[tc.n], tc.r); !errors.Is(err, ErrInvalidResponse) {
-			t.Fatalf("%s accepted: %v", tc.name, err)
+		t.Run(tc.name, func(t *testing.T) {
+			wantResponseCode(t, ValidateResponse(reqs[tc.n], tc.r), tc.code)
+		})
+	}
+}
+
+func TestValidateResponseRequiresIdentity(t *testing.T) {
+	zero := Response{SchemaVersion: SchemaVersion, Status: StatusAbstained, Reason: ReasonNoCandidates}
+	wantResponseCode(t, ValidateResponse(Request{}, zero), "request_id")
+	idOnly := zero
+	idOnly.RequestID = "req-1"
+	wantResponseCode(t, ValidateResponse(Request{RequestID: "req-1"}, idOnly), "candidate_set_hash")
+	upper := idOnly
+	upper.CandidateSetHash = strings.Repeat("A", 64)
+	wantResponseCode(t, ValidateResponse(Request{RequestID: "req-1", CandidateSetHash: upper.CandidateSetHash}, upper), "candidate_set_hash")
+	badID := zero
+	badID.RequestID, badID.CandidateSetHash = "req 1", strings.Repeat("a", 64)
+	wantResponseCode(t, ValidateResponse(Request{RequestID: "req 1", CandidateSetHash: badID.CandidateSetHash}, badID), "request_id")
+}
+
+func TestValidJevModel(t *testing.T) {
+	for _, s := range []string{"jev-1.13.0", "jev-0.0.0", "jev-10.200.3000", "jev-01.2.3"} {
+		if !ValidJevModel(s) {
+			t.Errorf("%q rejected", s)
+		}
+	}
+	for _, s := range []string{"", "jev-latest", "jev-preview", "jev-1.13", "jev-1.13.0.1", "jev-1.13.0-rc1", "Jev-1.13.0", "jev-1..0", "jev-.1.0", "jev-1.13.", " jev-1.13.0", "jev-1.13.0 ", "jev-1.13.0\n", "jev-a.b.c", "jev--1.0.0", "jev-1.\u0661.0", "xjev-1.13.0"} {
+		if ValidJevModel(s) {
+			t.Errorf("%q accepted", s)
 		}
 	}
 }

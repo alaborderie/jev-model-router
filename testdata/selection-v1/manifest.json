@@ -4,195 +4,263 @@
     "kind": "request",
     "valid": true,
     "request": null,
-    "candidate_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    "candidate_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "error": null
   },
   {
     "file": "singleton.json",
     "kind": "request",
     "valid": true,
     "request": null,
-    "candidate_set_hash": "04c55cbc25c880a61e31d9d5138e0b7dd5a01b6d608670224bec64018daeb5e5"
+    "candidate_set_hash": "04c55cbc25c880a61e31d9d5138e0b7dd5a01b6d608670224bec64018daeb5e5",
+    "error": null
   },
   {
     "file": "unicode.json",
     "kind": "request",
     "valid": true,
     "request": null,
-    "candidate_set_hash": "a97e1334e1457fc68f89741ddfcf97c65697826b1f537853eccc581ce0936969"
+    "candidate_set_hash": "a97e1334e1457fc68f89741ddfcf97c65697826b1f537853eccc581ce0936969",
+    "error": null
   },
   {
     "file": "invalid/trailing-value.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "trailing_data"
   },
   {
     "file": "invalid/duplicate-key-top.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "duplicate_key"
   },
   {
     "file": "invalid/duplicate-key-nested-state.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "duplicate_key"
+  },
+  {
+    "file": "invalid/duplicate-key-escaped.json",
+    "kind": "request",
+    "valid": false,
+    "request": null,
+    "candidate_set_hash": null,
+    "error": "duplicate_key"
   },
   {
     "file": "invalid/hash-mismatch.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "hash_mismatch"
   },
   {
     "file": "invalid/unknown-field.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "unknown_field"
   },
   {
     "file": "invalid/float-in-state.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "state_number"
   },
   {
     "file": "invalid/lone-surrogate.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "surrogate"
   },
   {
     "file": "invalid/bad-id-char.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "role_policy_version"
   },
   {
     "file": "invalid/schema-version-2.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "schema_version"
   },
   {
     "file": "invalid/duplicate-candidate-id.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "duplicate_candidate_id"
   },
   {
     "file": "invalid/revision-zero.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "configuration_revision"
   },
   {
     "file": "invalid/too-many-candidates.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "too_many_candidates"
   },
   {
     "file": "invalid/oversize.json",
     "kind": "request",
     "valid": false,
     "request": null,
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "too_large"
   },
   {
     "file": "responses/singleton-selected.json",
     "kind": "response",
     "valid": true,
     "request": "singleton.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": null
   },
   {
     "file": "responses/empty-abstained.json",
     "kind": "response",
     "valid": true,
     "request": "empty.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": null
   },
   {
     "file": "responses/unicode-classified.json",
     "kind": "response",
     "valid": true,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": null
   },
   {
     "file": "responses/unicode-low-confidence.json",
     "kind": "response",
     "valid": true,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": null
   },
   {
     "file": "responses/unicode-error-timeout.json",
     "kind": "response",
     "valid": true,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": null
   },
   {
     "file": "responses/invalid/stale-request-id.json",
     "kind": "response",
     "valid": false,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "request_id"
   },
   {
     "file": "responses/invalid/stale-hash.json",
     "kind": "response",
     "valid": false,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "candidate_set_hash"
   },
   {
     "file": "responses/invalid/out-of-set-candidate.json",
     "kind": "response",
     "valid": false,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "candidate_id"
   },
   {
     "file": "responses/invalid/selected-null-id.json",
     "kind": "response",
     "valid": false,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "candidate_id"
   },
   {
     "file": "responses/invalid/abstained-with-id.json",
     "kind": "response",
     "valid": false,
     "request": "empty.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "candidate_id"
   },
   {
     "file": "responses/invalid/confidence-above-one.json",
     "kind": "response",
     "valid": false,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "confidence"
   },
   {
     "file": "responses/invalid/singleton-reason-multi.json",
     "kind": "response",
     "valid": false,
     "request": "unicode.json",
-    "candidate_set_hash": null
+    "candidate_set_hash": null,
+    "error": "reason_for_candidate_count"
+  },
+  {
+    "file": "responses/invalid/classified-below-gate.json",
+    "kind": "response",
+    "valid": false,
+    "request": "unicode.json",
+    "candidate_set_hash": null,
+    "error": "confidence_gate"
+  },
+  {
+    "file": "responses/invalid/low-confidence-at-gate.json",
+    "kind": "response",
+    "valid": false,
+    "request": "unicode.json",
+    "candidate_set_hash": null,
+    "error": "confidence_gate"
+  },
+  {
+    "file": "responses/invalid/selector-model-alias.json",
+    "kind": "response",
+    "valid": false,
+    "request": "unicode.json",
+    "candidate_set_hash": null,
+    "error": "selector_model"
+  },
+  {
+    "file": "responses/invalid/singleton-invalid-response-inference.json",
+    "kind": "response",
+    "valid": false,
+    "request": "singleton.json",
+    "candidate_set_hash": null,
+    "error": "unexpected_inference"
   }
 ]

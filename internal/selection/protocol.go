@@ -10,9 +10,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"regexp"
 	"slices"
-	"sort"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -286,7 +287,7 @@ func pairedSurrogates(b []byte) bool {
 }
 
 func hex4(b []byte, at int) (rune, bool) {
-	if at < 0 || at+4 > len(b) {
+	if at+4 > len(b) {
 		return 0, false
 	}
 	n, err := strconv.ParseUint(string(b[at:at+4]), 16, 32)
@@ -306,6 +307,12 @@ func closedKeys(m map[string]any, keys []string) error {
 	}
 	return nil
 }
+
+var jevModelPattern = regexp.MustCompile(`^jev-[0-9]+\.[0-9]+\.[0-9]+$`)
+
+// ValidJevModel reports whether s is a pinned, versioned Jev model ID (^jev-[0-9]+\.[0-9]+\.[0-9]+$).
+// Moving aliases such as jev-latest are rejected because the confidence gate is calibrated per version.
+func ValidJevModel(s string) bool { return jevModelPattern.MatchString(s) }
 
 func validID(s string) bool {
 	if len(s) == 0 || len(s) > MaxIDBytes {
@@ -336,7 +343,7 @@ func structured(m map[string]any, key string, limit int) (json.RawMessage, error
 	if hasNumber(obj) {
 		return nil, invalid(key + "_number")
 	}
-	b, err := Canonical(obj)
+	b, err := canonical(obj)
 	if err != nil {
 		return nil, invalid(key)
 	}
@@ -399,12 +406,15 @@ func candidateFrom(v any) (Candidate, error) {
 		return Candidate{}, err
 	}
 	var c Candidate
-	for key, dst := range map[string]*string{"candidate_id": &c.CandidateID, "access_id": &c.AccessID, "engine": &c.Engine, "provider_id": &c.ProviderID, "model_id": &c.ModelID, "transport": &c.Transport, "capability_profile_version": &c.CapabilityProfileVersion, "description": &c.Description} {
-		s, ok := m[key].(string)
+	for _, f := range []struct {
+		key string
+		dst *string
+	}{{"candidate_id", &c.CandidateID}, {"access_id", &c.AccessID}, {"engine", &c.Engine}, {"provider_id", &c.ProviderID}, {"model_id", &c.ModelID}, {"transport", &c.Transport}, {"capability_profile_version", &c.CapabilityProfileVersion}, {"description", &c.Description}} {
+		s, ok := m[f.key].(string)
 		if !ok {
-			return Candidate{}, invalid(key)
+			return Candidate{}, invalid(f.key)
 		}
-		*dst = s
+		*f.dst = s
 	}
 	switch x := m["variant"].(type) {
 	case nil:
@@ -467,12 +477,12 @@ func CandidateHash(cs []Candidate) (string, error) {
 		return "", err
 	}
 	sorted := slices.Clone(cs)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].CandidateID < sorted[j].CandidateID })
+	slices.SortFunc(sorted, func(a, b Candidate) int { return strings.Compare(a.CandidateID, b.CandidateID) })
 	arr := make([]any, len(sorted))
 	for i, c := range sorted {
 		arr[i] = c.value()
 	}
-	b, err := Canonical(arr)
+	b, err := canonical(arr)
 	if err != nil {
 		return "", invalid("candidates")
 	}
@@ -480,10 +490,11 @@ func CandidateHash(cs []Candidate) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// Canonical encodes generic JSON values exactly like Python
+// canonical encodes generic JSON values exactly like Python
 // json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(",", ":")).
-// Only integers are accepted as numbers.
-func Canonical(v any) ([]byte, error) {
+// Only nonnegative integers (int64 or digit-only json.Number) are accepted as numbers;
+// production callers never pass any other number.
+func canonical(v any) ([]byte, error) {
 	var b bytes.Buffer
 	if err := writeCanonical(&b, v); err != nil {
 		return nil, err
@@ -500,18 +511,12 @@ func writeCanonical(b *bytes.Buffer, v any) error {
 	case string:
 		return writeString(b, x)
 	case json.Number:
-		s := string(x)
-		if len(s) > 0 && s[0] == '-' {
-			s = s[1:]
-		}
-		if !isDigits(s) || x == "-0" {
+		if !isDigits(string(x)) {
 			return errCanonical
 		}
 		b.WriteString(string(x))
 	case int64:
 		b.WriteString(strconv.FormatInt(x, 10))
-	case int:
-		b.WriteString(strconv.Itoa(x))
 	case []any:
 		b.WriteByte('[')
 		for i, e := range x {
@@ -528,7 +533,7 @@ func writeCanonical(b *bytes.Buffer, v any) error {
 		for k := range x {
 			keys = append(keys, k)
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 		b.WriteByte('{')
 		for i, k := range keys {
 			if i > 0 {
@@ -606,16 +611,17 @@ var reasonRules = map[string]reasonRule{
 	ReasonCancelled:       {StatusError, 0, MaxCandidates, false},
 }
 
-// ValidateResponse checks a response against the request it must answer, including request identity.
+// ValidateResponse checks a response against the request it must answer, including request
+// identity and the protocol-v1 ConfidenceGate. Every rejection wraps ErrInvalidResponse.
 func ValidateResponse(req Request, resp Response) error {
 	bad := func(code string) error { return fmt.Errorf("%w: %s", ErrInvalidResponse, code) }
 	if resp.SchemaVersion != SchemaVersion {
 		return bad("schema_version")
 	}
-	if resp.RequestID != req.RequestID {
+	if !validID(resp.RequestID) || resp.RequestID != req.RequestID {
 		return bad("request_id")
 	}
-	if resp.CandidateSetHash != req.CandidateSetHash {
+	if !isLowerHex64(resp.CandidateSetHash) || resp.CandidateSetHash != req.CandidateSetHash {
 		return bad("candidate_set_hash")
 	}
 	rule, ok := reasonRules[resp.Reason]
@@ -638,7 +644,7 @@ func ValidateResponse(req Request, resp Response) error {
 	if c := resp.Confidence; c != nil && (math.IsNaN(*c) || math.IsInf(*c, 0) || *c < 0 || *c > 1) {
 		return bad("confidence")
 	}
-	if resp.SelectorModel != nil && !validID(*resp.SelectorModel) {
+	if resp.SelectorModel != nil && !ValidJevModel(*resp.SelectorModel) {
 		return bad("selector_model")
 	}
 	if resp.LatencyMS < 0 {
@@ -652,8 +658,11 @@ func ValidateResponse(req Request, resp Response) error {
 		return bad("missing_inference")
 	case !rule.inference && resp.Confidence != nil:
 		return bad("confidence")
-	case !rule.inference && resp.Reason != ReasonInvalidResponse && (resp.SelectorModel != nil || resp.Usage != nil):
+	case !rule.inference && (resp.SelectorModel != nil || resp.Usage != nil) && (resp.Reason != ReasonInvalidResponse || len(req.Candidates) < 2):
 		return bad("unexpected_inference")
+	case resp.Reason == ReasonClassified && *resp.Confidence < ConfidenceGate,
+		resp.Reason == ReasonLowConfidence && *resp.Confidence >= ConfidenceGate:
+		return bad("confidence_gate")
 	}
 	return nil
 }
