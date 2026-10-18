@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "request_id": "req-singleton-0001",
+  "candidate_set_hash": "04c55cbc25c880a61e31d9d5138e0b7dd5a01b6d608670224bec64018daeb5e5",
+  "status": "selected",
+  "candidate_id": "opencode/test-provider/model-a:high",
+  "reason": "singleton",
+  "confidence": null,
+  "selector_model": null,
+  "latency_ms": 0,
+  "usage": null
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "request_id": "req-unicode-0001",
+  "candidate_set_hash": "a97e1334e1457fc68f89741ddfcf97c65697826b1f537853eccc581ce0936969",
+  "role_policy_version": "developer-v2",
+  "role_brief": {
+    "objective": "Choisir le modèle — 選択 <b> & </b>",
+    "notes": [
+      "tab\there",
+      "line sep para",
+      "escaped \u2028 and \u2029"
+    ]
+  },
+  "state": {
+    "venture": "Ölçü café 🧪 日本語",
+    "quote": "say \"hi\" \\ bye",
+    "flags": {
+      "urgent": true,
+      "blocked_by": null
+    },
+    "controls": [
+      "\u0001",
+      "x\u007Fy",
+      "literal \\u2028 text",
+      "real char"
+    ]
+  },
+  "candidates": [
+    {
+      "candidate_id": "cand-c",
+      "access_id": "access.test-03",
+      "engine": "claude",
+      "provider_id": "test-anthropic",
+      "model_id": "model-c",
+      "transport": "cli",
+      "variant": "max",
+      "capability_profile_version": "caps-2026.10",
+      "configuration_revision": 12,
+      "description": "Café naïve résumé — 日本語のテキスト 🚀 <b>&amp;</b> \"quoted\" back\\slash line\nbreak\ttab"
+    },
+    {
+      "candidate_id": "cand-a",
+      "access_id": "access.test-01",
+      "engine": "opencode",
+      "provider_id": "test-provider",
+      "model_id": "model-a",
+      "transport": "cli",
+      "variant": null,
+      "capability_profile_version": "caps-2026.10",
+      "configuration_revision": 1,
+      "description": "ctrl \u0001 del \u007F ls-text \\u2028 real-ps \u2029 pair \ud83d\ude80 end"
+    },
+    {
+      "candidate_id": "cand-b",
+      "access_id": "access.test-02",
+      "engine": "codex",
+      "provider_id": "test-openai",
+      "model_id": "model-b",
+      "transport": "cli",
+      "variant": "high",
+      "capability_profile_version": "caps-2026.09",
+      "configuration_revision": 9007199254740991,
+      "description": "中文 한국어 Ünïcödé quota \"unknown\"; ratio 3 < 4 & 5 > 2 \\ end"
+    }
+  ]
+}
