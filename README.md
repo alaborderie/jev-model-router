@@ -56,6 +56,14 @@ Install `mroute` and initialize its config as above. Copy `plugin/opencode/mrout
 
 Ask the agent to use the `route` tool with a prompt to launch a **separate one-shot task** via `mroute run`; its output is returned to the agent. Delegated work has no plugin-imposed task deadline; opencode cancellation terminates the child. The tool drains output while retaining at most 10 MiB of stdout for the result (with a truncation notice), so a large response does not terminate work. Engine stderr is drained without being returned. The `recommend` tool runs `mroute route --json` with a 2-second probe deadline, shows a toast and appends the recommendation to the TUI prompt when those surfaces are available. The recommendation also appears in the tool result if the TUI is unavailable. Neither tool switches the model of the active conversation. The configured Jev backend sends the bounded preview described under Configuration and privacy; use `heuristics` for offline routing. Run `node --test plugin/opencode/route.test.mjs` to exercise the local tool fixture.
 
+## Selection protocol (`mroute select`)
+
+```sh
+mroute select --json [--jev-model jev-1.13.0] < request.json > response.json
+```
+
+`mroute select` answers one selection request over caller-authorized candidates and writes exactly one JSON response line. It never reads `config.toml`, never writes the route log, never prints argv and never launches an engine; fallback and quota decisions stay with the caller. Empty and single-candidate requests need no model or key. Two or more candidates require a versioned `--jev-model` pin and `TYPESAFE_API_KEY`. Exit status is 0 for a selection or abstention, 1 for a selection error, and 2 for `invalid_request` (including two or more candidates without `--jev-model`) or bad arguments. The normative wire contract, limits and exit codes are in [`docs/contracts/selection-v1.md`](docs/contracts/selection-v1.md).
+
 ## M1 routing evaluation
 
 Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired backend configured. The 40 cases are hand-labeled examples of mechanical and complex coding tasks, not a representative production sample. On 2026-09-23, the starter target catalogue produced:

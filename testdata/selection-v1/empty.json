@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "request_id": "req-empty-0001",
+  "candidate_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "role_policy_version": "reviewer-v1",
+  "role_brief": {
+    "objective": "Review the pending change"
+  },
+  "state": {
+    "role": "reviewer",
+    "notes": []
+  },
+  "candidates": []
+}

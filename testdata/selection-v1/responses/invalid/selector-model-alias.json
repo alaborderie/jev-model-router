@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "request_id": "req-unicode-0001",
+  "candidate_set_hash": "a97e1334e1457fc68f89741ddfcf97c65697826b1f537853eccc581ce0936969",
+  "status": "selected",
+  "candidate_id": "cand-b",
+  "reason": "classified",
+  "confidence": 0.83,
+  "selector_model": "jev-latest",
+  "latency_ms": 312,
+  "usage": {
+    "input_tokens": 812,
+    "output_tokens": 3
+  }
+}

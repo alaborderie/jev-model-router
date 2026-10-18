@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,8 +14,19 @@ import (
 	"github.com/alaborderie/f-0923-jev-model-router/internal/router"
 )
 
+// exitStatus ends the process with a specific code. The command that returns it has
+// already written its own diagnostic, so main prints nothing further.
+type exitStatus int
+
+func (s exitStatus) Error() string { return fmt.Sprintf("exit status %d", int(s)) }
+func (s exitStatus) ExitCode() int { return int(s) }
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
+		var status exitStatus
+		if errors.As(err, &status) {
+			os.Exit(status.ExitCode())
+		}
 		fmt.Fprintln(os.Stderr, "mroute:", err)
 		os.Exit(1)
 	}
@@ -22,6 +34,10 @@ func main() {
 func run(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: mroute init|route|run|log|explain|eval|doctor|serve")
+	}
+	if args[0] == "select" {
+		// Selection never touches HOME, XDG config, the route log or engines.
+		return selectCommand(args[1:], os.Stdin, os.Stdout, os.Stderr)
 	}
 	if args[0] == "init" {
 		if len(args) > 2 || (len(args) == 2 && args[1] != "--force") {

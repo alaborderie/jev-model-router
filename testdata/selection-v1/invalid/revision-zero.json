@@ -1,0 +1,34 @@
+{
+  "candidate_set_hash": "ad325b06ec7df294ba2c7134e04e74de46ce140d23c961036764a7fe571e3cd7",
+  "candidates": [
+    {
+      "access_id": "access.test-01",
+      "candidate_id": "opencode/test-provider/model-a:high",
+      "capability_profile_version": "caps-2026.10",
+      "configuration_revision": 0,
+      "description": "Small tested code change; weekly quota 58% remaining",
+      "engine": "opencode",
+      "model_id": "model-a",
+      "provider_id": "test-provider",
+      "transport": "cli",
+      "variant": "high"
+    }
+  ],
+  "request_id": "req-singleton-0001",
+  "role_brief": {
+    "constraints": [
+      "no network access",
+      "tests first"
+    ],
+    "objective": "Implement and test the bounded change"
+  },
+  "role_policy_version": "developer-v1",
+  "schema_version": 1,
+  "state": {
+    "blocked_by": null,
+    "quota_remaining_pct": "42.5",
+    "role": "developer",
+    "task_kind": "implementation",
+    "urgent": false
+  }
+}

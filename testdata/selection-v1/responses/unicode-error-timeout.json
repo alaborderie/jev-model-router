@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "request_id": "req-unicode-0001",
+  "candidate_set_hash": "a97e1334e1457fc68f89741ddfcf97c65697826b1f537853eccc581ce0936969",
+  "status": "error",
+  "candidate_id": null,
+  "reason": "timeout",
+  "confidence": null,
+  "selector_model": null,
+  "latency_ms": 2001,
+  "usage": null
+}
