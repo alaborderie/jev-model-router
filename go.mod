@@ -1,4 +1,4 @@
-module github.com/alaborderie/f-0923-jev-model-router
+module github.com/alaborderie/jev-model-router
 
 go 1.27.1
 

@@ -1,29 +1,44 @@
 # mroute
 
-`mroute` chooses a user-configured coding CLI, model, and effort for a prompt, then launches that CLI for a **one-shot** task. It does not change the model in an active conversation. The engine CLI keeps its own authentication; mroute does not proxy or store provider credentials.
+`mroute` picks a coding CLI, model and effort level for a task, then launches that CLI for a **one-shot** run. You describe your targets once (for example "Claude Haiku at low effort for mechanical edits, Claude Opus at high effort for debugging and design"), and mroute classifies each prompt against that catalogue.
 
-The container image runs `mroute serve` on port 8080. `GET /` serves the static landing page, `/styles.css` serves its stylesheet, and `GET /healthz` returns 200. The page and CSS are embedded in the binary, so no runtime asset directory is required. The server does not accept prompts, expose a routing API, or use a TypeSafe key. To route work, install and run the CLI locally.
+Why: most coding prompts don't need the most expensive model at maximum effort, and choosing by hand every time is tedious. mroute makes the choice explicit and inspectable — you can see the route, confidence and fallback reason before anything runs.
 
-On a push to `main`, the image workflow requires the four `VPS_SSH_*` secrets, publishes GHCR `latest` and SHA tags, then SSHes to the VPS to restart `deployment/f-0923-jev-model-router` in namespace `default` and wait up to 120 seconds for rollout. The deployment must already exist; the workflow does not apply infrastructure manifests. Publishing and deployment are serialized, and a failed publish prevents deployment.
+What it is not: it does not change the model of an active conversation, proxy provider APIs, or store credentials. Each engine CLI (`claude`, `opencode`, `codex`) keeps its own authentication.
 
-## Install and quick start
+## Install
 
-This repository is a **private preview**. Installation, GitHub documentation, and issue links require repository access; anonymous visitors receive a GitHub 404. The commands below are for the owner and authorized collaborators with authenticated Git access and `GOPRIVATE=github.com/alaborderie/f-0923-jev-model-router` configured. There is no anonymous download or signup yet.
-
-Prerequisites: Go 1.27.1 or newer and at least one installed and authenticated engine CLI (`claude`, `opencode`, or `codex`).
+Requires Go 1.27.1 or newer and at least one installed, authenticated engine CLI (`claude`, `opencode` or `codex`).
 
 ```sh
-go install github.com/alaborderie/f-0923-jev-model-router/cmd/mroute@latest
-mroute init
-# Review ~/.config/mroute/config.toml: offline heuristics without a key.
-mroute doctor
-mroute route "Explain this error"
-mroute run "Explain this error"
+go install github.com/alaborderie/jev-model-router/cmd/mroute@latest
 ```
 
-`mroute route` prints a recommendation without launching an engine. `mroute run` launches the selected engine. `mroute log` shows the JSONL decision log and `mroute explain` shows the latest decision. Run `mroute eval eval/cases.jsonl` from the repository to measure the included 40-case set.
+## Quick start
 
-Use `mroute route --json "Explain this error"` for a JSON recommendation. To route prompt text beginning with a flag, put `--` before the prompt: `mroute route -- --json` routes the literal prompt `--json` in human-readable mode, and `mroute route --json -- --json` routes it in JSON mode.
+```sh
+mroute init                       # writes ~/.config/mroute/config.toml
+mroute doctor                     # checks each configured engine CLI
+mroute route "Explain this error" # prints the recommendation, runs nothing
+mroute run "Explain this error"   # launches the selected engine
+mroute explain                    # shows the latest decision
+```
+
+`mroute log` shows the JSONL decision log. Use `mroute route --json "…"` for machine-readable output. To route prompt text that begins with a flag, put `--` before it: `mroute route -- --json` routes the literal prompt `--json`.
+
+Without `TYPESAFE_API_KEY`, `init` selects the offline `heuristics` classifier, so you can try everything without a key or network access.
+
+## How it works
+
+1. The config lists `[[target]]` entries: engine, model, supported efforts, and a short `when` description.
+2. A classifier scores the prompt against those descriptions and picks a target and an effort level:
+   - `heuristics`: offline word overlap between the prompt and each target's `when` text, plus a few effort keywords.
+   - `jev`: TypeSafe's hosted Jev model (`TYPESAFE_API_KEY`); sends a bounded prompt preview.
+   - `openai`: any OpenAI-compatible endpoint, including a local model.
+3. If confidence is below `classifier.confidence_gate`, or classification fails or times out, mroute falls back to `routing.safe_target`.
+4. The decision (prompt hash, target, effort, confidence, reason, argv) is appended to a local log, and `run` executes the engine CLI with the chosen flags.
+
+The same decision path backs the CLI, the Claude Code and opencode plugins, and `mroute eval`.
 
 ## Configuration and privacy
 
@@ -31,20 +46,20 @@ Use `mroute route --json "Explain this error"` for a JSON recommendation. To rou
 
 The optional `jev` classifier sends a bounded prompt preview (at most `classifier.preview_bytes`, initially 8000 bytes) to TypeSafe. Set `TYPESAFE_API_KEY` in the environment, not the config. Set `classifier.backend = "heuristics"` for offline routing without a key or network. `openai` can use a local OpenAI-compatible endpoint. Full prompts and keys are not written to route logs.
 
-The CLI runs only one task at a time. Plugin recommendations in later milestones will not silently switch the model in an existing Claude Code or opencode session.
+The CLI runs only one task at a time. Plugin recommendations never silently switch the model in an existing Claude Code or opencode session.
 
 ## Claude Code plugin
 
 After installing `mroute` and running `mroute init`, add this repository as a Claude Code marketplace and install its plugin:
 
 ```sh
-claude plugin marketplace add alaborderie/f-0923-jev-model-router
+claude plugin marketplace add alaborderie/jev-model-router
 claude plugin install mroute@mroute-marketplace
 ```
 
 Restart Claude Code, then use `/mroute:route Explain this error` for a separate one-shot task. The plugin passes the prompt to the local `mroute` tool as structured data, which launches `mroute run`; it does not change the model of the current conversation. If the command is missing, confirm `mroute` is on Claude Code's `PATH` and that `mroute init` has created a config.
 
-Installing and enabling the plugin also opts in to its `UserPromptSubmit` recommendation hook. The hook calls `mroute route` with a hard 1.8-second routing deadline (2 seconds at the Claude hook boundary), based on M1's 360 ms Jev p95. It adds a one-line recommendation to Claude's context; it does not switch models. If the CLI is missing, classification fails, or the deadline expires, it emits nothing and lets the prompt continue. To disable the hook, disable the plugin with `claude plugin disable mroute@mroute-marketplace`. The Jev backend sends the bounded prompt preview described above on each prompt; select `heuristics` in the config for an offline hook.
+Installing and enabling the plugin also opts in to its `UserPromptSubmit` recommendation hook. The hook calls `mroute route` with a hard 1.8-second routing deadline (2 seconds at the Claude hook boundary), based on the measured 360 ms Jev p95. It adds a one-line recommendation to Claude's context; it does not switch models. If the CLI is missing, classification fails, or the deadline expires, it emits nothing and lets the prompt continue. To disable the hook, disable the plugin with `claude plugin disable mroute@mroute-marketplace`. The Jev backend sends the bounded prompt preview described above on each prompt; select `heuristics` in the config for an offline hook.
 
 For Claude `Agent`/legacy `Task` subagent spawns, the plugin can set the subagent model to the routed Claude family (`haiku`, `sonnet`, or `opus`). It leaves an explicitly chosen model alone and skips unsupported event shapes, non-Claude targets, and classifier failures. The subagent gets a model for its own task; the active conversation never changes models mid-turn. Its `PreToolUse` hook shares the same 1.8-second routing deadline. Both hooks are enabled with the plugin and can be turned off by disabling it.
 
@@ -64,7 +79,7 @@ mroute select --json [--jev-model jev-1.13.0] < request.json > response.json
 
 `mroute select` answers one selection request over caller-authorized candidates and writes exactly one JSON response line. It never reads `config.toml`, never writes the route log, never prints argv and never launches an engine; fallback and quota decisions stay with the caller. Empty and single-candidate requests need no model or key. Two or more candidates require a versioned `--jev-model` pin and `TYPESAFE_API_KEY`. Exit status is 0 for a selection or abstention, 1 for a selection error, and 2 for `invalid_request` (including two or more candidates without `--jev-model`) or bad arguments. The normative wire contract, limits and exit codes are in [`docs/contracts/selection-v1.md`](docs/contracts/selection-v1.md).
 
-## M1 routing evaluation
+## Routing evaluation
 
 Run `mroute eval eval/cases.jsonl` from a repository checkout with the desired backend configured. The 40 cases are hand-labeled examples of mechanical and complex coding tasks, not a representative production sample. On 2026-09-23, the starter target catalogue produced:
 
@@ -75,7 +90,7 @@ For a deterministic offline table, run `go run ./cmd/mroute eval --table --confi
 | Jev (`jev-latest`) | 92.5% | 95.0% | 288 ms | 360 ms |
 | Heuristics | 62.5% | 32.5% | 0 ms | 0 ms |
 
-Jev passed the M1 gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms p50, and 2500 ms p95 on this seed set. Three Jev cases fell below the configured 0.60 choice-confidence gate and routed to the safe target. Results can shift when the `jev-latest` alias or network conditions change. The confidence gate and fallback are included in the reported accuracy; `mroute eval` uses the same decision path as `route` and `run`.
+Jev passed the project's acceptance gate of 80% target accuracy, 75% effort-band accuracy, 1500 ms p50, and 2500 ms p95 on this seed set. Three Jev cases fell below the configured 0.60 choice-confidence gate and routed to the safe target. Results can shift when the `jev-latest` alias or network conditions change. The confidence gate and fallback are included in the reported accuracy; `mroute eval` uses the same decision path as `route` and `run`.
 
 ## Configuration reference
 
@@ -110,11 +125,20 @@ claude: supported (required flags: -p, --model, --effort)
 
 Claude needs `-p`, `--model`, and `--effort`; opencode needs `run -m --variant`; Codex needs `exec -m -c`. A missing binary reports `command unavailable`; an older CLI whose help lacks a required flag reports e.g. `opencode: missing --variant (required flags: -m, --variant)` and `mroute doctor` exits nonzero. Update the engine CLI or choose supported targets before launching routed work.
 
-## Website, license and publication
+## Website
 
-[Public preview and routing walkthrough](https://jev-model-router.antoinelaborderie.com/).
-The source is prepared under the [MIT license](LICENSE). This does not make the
-private repository anonymously accessible. See [publication checklist](distribution/publication.md)
-for release commands, access checks and the remaining owner approvals.
-[Offline route receipt](distribution/offline-receipt.md) documents a local run;
-no hosted classifier call or engine task was executed to capture it.
+`mroute serve` runs the static landing page at <https://jev-model-router.antoinelaborderie.com/> (port 8080, with `GET /healthz`). It does not accept prompts or expose a routing API. The `Dockerfile` builds that server; images are published to `ghcr.io/alaborderie/jev-model-router` on pushes to `main`. [Offline route receipt](distribution/offline-receipt.md) documents a captured local run.
+
+## Development
+
+```sh
+go build ./...
+go vet ./...
+go test ./...
+node --test plugin/opencode/route.test.mjs
+scripts/package-release.sh dist   # linux/darwin × amd64/arm64 archives + SHA256SUMS
+```
+
+## License
+
+[MIT](LICENSE)

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/selection"
+	"github.com/alaborderie/jev-model-router/internal/selection"
 )
 
 const fixtureDir = "../../testdata/selection-v1/"

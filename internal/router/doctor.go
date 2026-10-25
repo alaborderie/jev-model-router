@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/config"
+	"github.com/alaborderie/jev-model-router/internal/config"
 )
 
 type Capability struct {

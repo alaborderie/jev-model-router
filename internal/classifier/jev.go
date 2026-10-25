@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/config"
+	"github.com/alaborderie/jev-model-router/internal/config"
 )
 
 const JevURL = "https://api.typesafe.ai/v1/systemone"

@@ -37,7 +37,7 @@ func TestLandingAssets(t *testing.T) {
 	for _, tc := range []struct {
 		path, contentType, content string
 	}{
-		{"/", "text/html; charset=utf-8", "go install github.com/alaborderie/f-0923-jev-model-router/cmd/mroute@latest"},
+		{"/", "text/html; charset=utf-8", "go install github.com/alaborderie/jev-model-router/cmd/mroute@latest"},
 		{"/styles.css", "text/css; charset=utf-8", "@media"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
@@ -50,12 +50,12 @@ func TestLandingAssets(t *testing.T) {
 	}
 }
 
-func TestLandingDisclosesPrivateAccess(t *testing.T) {
+func TestLandingOffersPublicRelease(t *testing.T) {
 	r := httptest.NewRecorder()
 	healthHandler().ServeHTTP(r, httptest.NewRequest("GET", "/", nil))
-	for _, notice := range []string{"Private preview", "Repository access required", "Private docs", "Private GitHub", "Private issues", "Anonymous visitors will see a GitHub 404"} {
+	for _, notice := range []string{"Install mroute", "cmd/mroute@latest", "Install help"} {
 		if !strings.Contains(r.Body.String(), notice) {
-			t.Errorf("landing missing access notice %q", notice)
+			t.Errorf("landing missing public install copy %q", notice)
 		}
 	}
 }

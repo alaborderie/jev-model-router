@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/router"
+	"github.com/alaborderie/jev-model-router/internal/router"
 )
 
 func hookAgent(in io.Reader, out io.Writer) error {

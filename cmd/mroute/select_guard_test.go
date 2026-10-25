@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const modulePath = "github.com/alaborderie/f-0923-jev-model-router/"
+const modulePath = "github.com/alaborderie/jev-model-router/"
 
 // TestSelectionNeverImportsLegacyRouting makes "never the legacy safe target" structural:
 // the selection path cannot reach the router or the user target catalogue, and uses
