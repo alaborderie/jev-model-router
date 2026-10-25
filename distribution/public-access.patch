@@ -11,11 +11,11 @@
 @@ -20,5 +20,5 @@
      <nav aria-label="Main navigation">
 -      <a href="#install">Preview setup</a>
--      <a href="https://github.com/alaborderie/f-0923-jev-model-router#readme">Private docs ↗</a>
--      <a href="https://github.com/alaborderie/f-0923-jev-model-router">Private GitHub ↗</a>
+-      <a href="https://github.com/alaborderie/jev-model-router#readme">Private docs ↗</a>
+-      <a href="https://github.com/alaborderie/jev-model-router">Private GitHub ↗</a>
 +      <a href="#install">Install mroute</a>
-+      <a href="https://github.com/alaborderie/f-0923-jev-model-router#readme">Docs ↗</a>
-+      <a href="https://github.com/alaborderie/f-0923-jev-model-router">GitHub ↗</a>
++      <a href="https://github.com/alaborderie/jev-model-router#readme">Docs ↗</a>
++      <a href="https://github.com/alaborderie/jev-model-router">GitHub ↗</a>
      </nav>
 @@ -26,6 +26,2 @@
    <main id="main">
@@ -26,8 +26,8 @@
      <section class="hero" aria-labelledby="title">
 @@ -35,3 +31,3 @@
          <p class="intro">Choose a coding CLI, model, and effort for the task in front of you. See the recommendation before launching a separate one-shot task.</p>
--        <div class="actions"><a class="button" href="#install">Preview setup →</a><a href="https://github.com/alaborderie/f-0923-jev-model-router#configuration-and-privacy">Routing docs (private) ↗</a></div>
-+        <div class="actions"><a class="button" href="#install">Install mroute →</a><a href="https://github.com/alaborderie/f-0923-jev-model-router#configuration-and-privacy">Routing docs ↗</a></div>
+-        <div class="actions"><a class="button" href="#install">Preview setup →</a><a href="https://github.com/alaborderie/jev-model-router#configuration-and-privacy">Routing docs (private) ↗</a></div>
++        <div class="actions"><a class="button" href="#install">Install mroute →</a><a href="https://github.com/alaborderie/jev-model-router#configuration-and-privacy">Routing docs ↗</a></div>
          <p class="note">Your active conversation keeps its model. Your engine CLI keeps its authentication.</p>
 @@ -59,4 +55,4 @@
      <section class="install" id="install" aria-labelledby="install-title">
@@ -42,14 +42,14 @@
 +    <section class="more" id="receipt" aria-labelledby="receipt-title"><h2 id="receipt-title">Inspect a route without a model request.</h2><p>In a source checkout, use the committed offline catalogue. This classifies locally and records a decision; it does not execute the selected CLI.</p><pre tabindex="0" aria-label="Offline receipt commands"><code>mkdir -p .local-demo/mroute
  cp eval/heuristics.toml .local-demo/mroute/config.toml
  XDG_CONFIG_HOME="$PWD/.local-demo" XDG_STATE_HOME="$PWD/.local-demo" go run ./cmd/mroute route --json -- "Rename foo to bar"
--XDG_CONFIG_HOME="$PWD/.local-demo" XDG_STATE_HOME="$PWD/.local-demo" go run ./cmd/mroute explain</code></pre><p>The receipt includes target, effort, confidence, fallback reason and argv. The <a href="https://github.com/alaborderie/f-0923-jev-model-router/blob/main/distribution/offline-receipt.md">captured offline example (private)</a> records the catalogue and source revision. A recommendation is not proof of engine execution.</p></section>
-+XDG_CONFIG_HOME="$PWD/.local-demo" XDG_STATE_HOME="$PWD/.local-demo" go run ./cmd/mroute explain</code></pre><p>The receipt includes target, effort, confidence, fallback reason and argv. The <a href="https://github.com/alaborderie/f-0923-jev-model-router/blob/main/distribution/offline-receipt.md">captured offline example</a> records the catalogue and source revision. A recommendation is not proof of engine execution.</p></section>
+-XDG_CONFIG_HOME="$PWD/.local-demo" XDG_STATE_HOME="$PWD/.local-demo" go run ./cmd/mroute explain</code></pre><p>The receipt includes target, effort, confidence, fallback reason and argv. The <a href="https://github.com/alaborderie/jev-model-router/blob/main/distribution/offline-receipt.md">captured offline example (private)</a> records the catalogue and source revision. A recommendation is not proof of engine execution.</p></section>
++XDG_CONFIG_HOME="$PWD/.local-demo" XDG_STATE_HOME="$PWD/.local-demo" go run ./cmd/mroute explain</code></pre><p>The receipt includes target, effort, confidence, fallback reason and argv. The <a href="https://github.com/alaborderie/jev-model-router/blob/main/distribution/offline-receipt.md">captured offline example</a> records the catalogue and source revision. A recommendation is not proof of engine execution.</p></section>
      <section class="more" id="privacy"><h2>Privacy and scope</h2><p>Heuristics classification does not contact a service. Jev classification sends a bounded prompt preview to TypeSafe. A separate engine run follows that CLI's own data handling. Local route logs record a prompt hash and routing metadata, not the prompt text. Review logs before sharing.</p><p>This is a separate-task launcher, not an automatic active-session model switcher. There is no hosted routing API, telemetry, account or waitlist on this page.</p></section>
--    <section class="more" aria-labelledby="plugins-title"><h2 id="plugins-title">Use it from your existing tools.</h2><p>Claude Code and opencode integrations recommend or delegate separate tasks. They do not silently switch the model in an active session. Setup guides require private repository access.</p><a href="https://github.com/alaborderie/f-0923-jev-model-router#claude-code-plugin">Claude Code setup (private) ↗</a><a href="https://github.com/alaborderie/f-0923-jev-model-router#opencode-plugin">opencode setup (private) ↗</a></section>
-+    <section class="more" aria-labelledby="plugins-title"><h2 id="plugins-title">Use it from your existing tools.</h2><p>Claude Code and opencode integrations recommend or delegate separate tasks. They do not silently switch the model in an active session. Setup guides are in the repository.</p><a href="https://github.com/alaborderie/f-0923-jev-model-router#claude-code-plugin">Claude Code setup ↗</a><a href="https://github.com/alaborderie/f-0923-jev-model-router#opencode-plugin">opencode setup ↗</a></section>
+-    <section class="more" aria-labelledby="plugins-title"><h2 id="plugins-title">Use it from your existing tools.</h2><p>Claude Code and opencode integrations recommend or delegate separate tasks. They do not silently switch the model in an active session. Setup guides require private repository access.</p><a href="https://github.com/alaborderie/jev-model-router#claude-code-plugin">Claude Code setup (private) ↗</a><a href="https://github.com/alaborderie/jev-model-router#opencode-plugin">opencode setup (private) ↗</a></section>
++    <section class="more" aria-labelledby="plugins-title"><h2 id="plugins-title">Use it from your existing tools.</h2><p>Claude Code and opencode integrations recommend or delegate separate tasks. They do not silently switch the model in an active session. Setup guides are in the repository.</p><a href="https://github.com/alaborderie/jev-model-router#claude-code-plugin">Claude Code setup ↗</a><a href="https://github.com/alaborderie/jev-model-router#opencode-plugin">opencode setup ↗</a></section>
    </main>
--  <footer><span>mroute / private preview</span><a href="https://github.com/alaborderie/f-0923-jev-model-router/issues">Private issues ↗</a></footer>
-+  <footer><span>mroute / local CLI</span><a href="https://github.com/alaborderie/f-0923-jev-model-router/issues">Install help ↗</a></footer>
+-  <footer><span>mroute / private preview</span><a href="https://github.com/alaborderie/jev-model-router/issues">Private issues ↗</a></footer>
++  <footer><span>mroute / local CLI</span><a href="https://github.com/alaborderie/jev-model-router/issues">Install help ↗</a></footer>
  </body>
 --- a/README.md
 +++ b/README.md

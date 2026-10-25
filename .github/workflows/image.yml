@@ -44,8 +44,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/alaborderie/f-0923-jev-model-router:latest
-            ghcr.io/alaborderie/f-0923-jev-model-router:${{ github.sha }}
+            ghcr.io/alaborderie/jev-model-router:latest
+            ghcr.io/alaborderie/jev-model-router:${{ github.sha }}
   deploy:
     needs: publish
     runs-on: [self-hosted, jarvis]

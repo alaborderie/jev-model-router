@@ -38,7 +38,7 @@ The CLI runs only one task at a time. Plugin recommendations in later milestones
 After installing `mroute` and running `mroute init`, add this repository as a Claude Code marketplace and install its plugin:
 
 ```sh
-claude plugin marketplace add alaborderie/f-0923-jev-model-router
+claude plugin marketplace add alaborderie/jev-model-router
 claude plugin install mroute@mroute-marketplace
 ```
 
