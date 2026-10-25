@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/router"
+	"github.com/alaborderie/jev-model-router/internal/router"
 )
 
 func TestAgentHookFixtures(t *testing.T) {

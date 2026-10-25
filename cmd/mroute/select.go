@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/selection"
+	"github.com/alaborderie/jev-model-router/internal/selection"
 )
 
 // selectDeadline bounds the whole select command; Jev applies its own shorter HTTP deadline.

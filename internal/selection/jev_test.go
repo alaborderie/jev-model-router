@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/classifier"
+	"github.com/alaborderie/jev-model-router/internal/classifier"
 )
 
 const (

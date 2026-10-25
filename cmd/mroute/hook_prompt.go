@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/router"
+	"github.com/alaborderie/jev-model-router/internal/router"
 )
 
 // The Jev seed-set p95 was 360 ms. Leave room for process startup and network

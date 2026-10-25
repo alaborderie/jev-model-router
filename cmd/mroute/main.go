@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alaborderie/f-0923-jev-model-router/internal/config"
-	"github.com/alaborderie/f-0923-jev-model-router/internal/eval"
-	"github.com/alaborderie/f-0923-jev-model-router/internal/router"
+	"github.com/alaborderie/jev-model-router/internal/config"
+	"github.com/alaborderie/jev-model-router/internal/eval"
+	"github.com/alaborderie/jev-model-router/internal/router"
 )
 
 // exitStatus ends the process with a specific code. The command that returns it has
